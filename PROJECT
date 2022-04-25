@@ -12,5 +12,5 @@ resources:
   domain: my.domain
   group: webapp
   kind: Guestbook
-  path: keikoproj.intuit.com/Flippy/api/v1
+  path: github.com/keikoproj/flippy/api/v1
   version: v1

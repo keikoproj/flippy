@@ -2,13 +2,13 @@ package Reconciler
 
 import (
 	"errors"
+	crdv1 "github.com/keikoproj/flippy/api/v1"
+	"github.com/keikoproj/flippy/controllers/RestartProcessor"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-	crdv1 "keikoproj.intuit.com/Flippy/api/v1"
-	"keikoproj.intuit.com/Flippy/controllers/RestartProcessor"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/utils"
 	"strings"
 	"time"
 )

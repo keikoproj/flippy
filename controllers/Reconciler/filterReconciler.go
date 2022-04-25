@@ -1,12 +1,12 @@
 package Reconciler
 
 import (
+	crdv1 "github.com/keikoproj/flippy/api/v1"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	crdv1 "keikoproj.intuit.com/Flippy/api/v1"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/utils"
 	"strings"
 )
 
