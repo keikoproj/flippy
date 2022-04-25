@@ -11,7 +11,7 @@ on:
 jobs:
   push:
     name: push
-    if: github.repository_owner == 'keikoproj'
+    if: github.repository_owner == 'virajrk'
     runs-on: ubuntu-18.04
     steps:
 
