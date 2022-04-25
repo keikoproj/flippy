@@ -1,0 +1,47 @@
+apiVersion: keikoproj.intuit.com/v1
+kind: FlippyConfig
+metadata:
+  name: flippy-sample
+  namespace: istio-system
+spec:
+  # Add fields here
+  foo: bar1
+  ImageList:
+    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:intuit_master-1.10.4-01599
+    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:intuit_master-1.10.4-foo
+  PostFilterRestarts:
+    - K8S:
+        Type: Deployment
+        Name: istio-ingressgateway
+        Namespace: istio-system
+      StatusCheckConfig:
+        CheckStatus: true
+        MaxRetry: 10
+        RetryDuration: 30
+  Preconditions:
+    - K8S:
+        Type: Deployment
+        Name: istiod
+        Namespace: istio-system
+      StatusCheckConfig:
+        CheckStatus: true
+        MaxRetry: 10
+        RetryDuration: 30
+  RestartObjects:
+    - Type: Deployment
+      StatusCheckConfig:
+        CheckStatus: false
+        MaxRetry: 10
+        RetryDuration: 30
+    - Type: ArgoRollout
+      StatusCheckConfig:
+        CheckStatus: false
+        MaxRetry: 10
+        RetryDuration: 30
+  ProcessFilter:
+    Containers:
+      - istio-proxy
+    Labels:
+      "istio-injection": "enabled"
+    Annotations:
+      "sidecar.istio.io/inject": "true"

@@ -1,0 +1,184 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: flippyconfigs.keikoproj.io
+spec:
+  group: keikoproj.io
+  names:
+    kind: FlippyConfig
+    listKind: FlippyConfigList
+    plural: flippyconfigs
+    singular: flippyconfig
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: FlippyConfig is the Schema for the FlippyConfig API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FlippyConfigSpec defines the desired state of FlippyConfig
+            properties:
+              ImageList:
+                description: List of allowed docker images
+                items:
+                  type: string
+                type: array
+              PostFilterRestarts:
+                items:
+                  properties:
+                    K8S:
+                      description: Kubernetes Object
+                      properties:
+                        Name:
+                          description: Name of the object
+                          type: string
+                        Namespace:
+                          description: Namespace it belongs
+                          type: string
+                        Type:
+                          description: Type of object. E.g Deployment
+                          type: string
+                      type: object
+                    Status:
+                      description: Status to be verified
+                      type: string
+                    StatusCheckConfig:
+                      description: Retry configuration for status check
+                      properties:
+                        CheckStatus:
+                          description: CheckStatus after
+                          type: boolean
+                        MaxRetry:
+                          description: Retries to check status
+                          type: integer
+                        RetryDuration:
+                          description: Retry duration in seconds
+                          type: integer
+                      type: object
+                  type: object
+                type: array
+              Preconditions:
+                description: List of precondition before rotating any pod
+                items:
+                  properties:
+                    K8S:
+                      description: Kubernetes Object
+                      properties:
+                        Name:
+                          description: Name of the object
+                          type: string
+                        Namespace:
+                          description: Namespace it belongs
+                          type: string
+                        Type:
+                          description: Type of object. E.g Deployment
+                          type: string
+                      type: object
+                    Status:
+                      description: Status to be verified
+                      type: string
+                    StatusCheckConfig:
+                      description: Retry configuration for status check
+                      properties:
+                        CheckStatus:
+                          description: CheckStatus after
+                          type: boolean
+                        MaxRetry:
+                          description: Retries to check status
+                          type: integer
+                        RetryDuration:
+                          description: Retry duration in seconds
+                          type: integer
+                      type: object
+                  type: object
+                type: array
+              ProcessFilter:
+                description: List of conditions on which pods get filter
+                properties:
+                  Annotations:
+                    additionalProperties:
+                      type: string
+                    description: List of annotation on object eg. Deployment ArgoRollouts
+                    type: object
+                  Containers:
+                    description: Container names
+                    items:
+                      type: string
+                    type: array
+                  Labels:
+                    additionalProperties:
+                      type: string
+                    description: Metdata Namespace Label Filter
+                    type: object
+                  PodLabels:
+                    additionalProperties:
+                      type: string
+                    description: Metdata Pod Label Filter
+                    type: object
+                  PreProcessRestart:
+                    properties:
+                      Name:
+                        description: Name of the object
+                        type: string
+                      Namespace:
+                        description: Namespace it belongs
+                        type: string
+                      Type:
+                        description: Type of object. E.g Deployment
+                        type: string
+                    type: object
+                type: object
+              RestartObjects:
+                items:
+                  properties:
+                    StatusCheckConfig:
+                      description: Retry configuration for status check
+                      properties:
+                        CheckStatus:
+                          description: CheckStatus after
+                          type: boolean
+                        MaxRetry:
+                          description: Retries to check status
+                          type: integer
+                        RetryDuration:
+                          description: Retry duration in seconds
+                          type: integer
+                      type: object
+                    Type:
+                      description: Type of object to be restarted
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: FlippyConfigStatus defines the observed state of FlippyConfig
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

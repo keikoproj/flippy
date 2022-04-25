@@ -1,0 +1,125 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: flippy
+  name: flippy-service-account
+  namespace: istio-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: flippy-cluster-role
+  namespace: istio-system
+  labels:
+    k8s-app: flippy
+rules:
+  - apiGroups: ["*"]
+    resources: ["configmaps","pods","namespaces","deployments","replicasets"]
+    verbs: ["*"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["keikoproj.io"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flippy-cluster-role-binding
+  namespace: istio-system
+  labels:
+    k8s-app: flippy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flippy-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: flippy-service-account
+    namespace: istio-system
+---
+#apiVersion: apps/v1
+#kind: Deployment
+#metadata:
+#  name: flippy
+#  namespace: istio-system
+#  labels:
+#    app: flippy
+#spec:
+#  replicas: 1
+#  selector:
+#    matchLabels:
+#      app: flippy
+#  template:
+#    metadata:
+#      labels:
+#        app: flippy
+#    spec:
+#      serviceAccountName: flippy-service-account
+#      containers:
+#        - image: docker.intuit.com/services/mesh/flippy/service/flippy:5f757
+#          name: flippy
+#          resources:
+#            limits:
+#              cpu: 1
+#              memory: 1Gi
+#            requests:
+#              cpu: 300m
+#              memory: 500Mi
+#          volumeMounts:
+#            - name: ssl-certs
+#              mountPath: /etc/ssl/certs/ca-certificates.crt
+#              readOnly: true
+#          imagePullPolicy: "Always"
+#      affinity:
+#        nodeAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            nodeSelectorTerms:
+#              - matchExpressions:
+#                  - key: beta.kubernetes.io/arch
+#                    operator: In
+#                    values:
+#                      - amd64
+#                      - ppc64le
+#                      - s390x
+#                  - key: node.kubernetes.io/role
+#                    operator: In
+#                    values:
+#                      - "istio"
+#          preferredDuringSchedulingIgnoredDuringExecution:
+#            - weight: 2
+#              preference:
+#                matchExpressions:
+#                  - key: beta.kubernetes.io/arch
+#                    operator: In
+#                    values:
+#                      - amd64
+#            - weight: 2
+#              preference:
+#                matchExpressions:
+#                  - key: beta.kubernetes.io/arch
+#                    operator: In
+#                    values:
+#                      - ppc64le
+#            - weight: 2
+#              preference:
+#                matchExpressions:
+#                  - key: beta.kubernetes.io/arch
+#                    operator: In
+#                    values:
+#                      - s390x
+#      tolerations:
+#        - effect: NoSchedule
+#          key: ig/istiocontrol
+#          operator: Exists
+#        - effect: NoExecute
+#          key: ig/istiocontrol
+#          operator: Exists
+#      volumes:
+#        - name: ssl-certs
+#          hostPath:
+#            path: "/etc/ssl/certs/ca-bundle.crt"
+#---
