@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	argo "github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/utils"
 
 	//"fmt"
 	"os/exec"

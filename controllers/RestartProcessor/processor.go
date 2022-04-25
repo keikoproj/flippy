@@ -1,10 +1,10 @@
 package RestartProcessor
 
 import (
+	crdv1 "github.com/keikoproj/flippy/api/v1"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
 	log "github.com/sirupsen/logrus"
-	crdv1 "keikoproj.intuit.com/Flippy/api/v1"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
 	"strconv"
 	"strings"
 	"time"

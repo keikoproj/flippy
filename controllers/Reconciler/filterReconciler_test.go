@@ -1,10 +1,10 @@
 package Reconciler
 
 import (
+	v1 "github.com/keikoproj/flippy/api/v1"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
 	corev1 "k8s.io/api/core/v1"
-	v1 "keikoproj.intuit.com/Flippy/api/v1"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
 	"testing"
 )
 

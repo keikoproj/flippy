@@ -4,6 +4,9 @@ import (
 	"errors"
 	argov1alpha1 "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	argo "github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
+	flippyv1 "github.com/keikoproj/flippy/api/v1"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
@@ -12,9 +15,6 @@ import (
 	metaapiv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	flippyv1 "keikoproj.intuit.com/Flippy/api/v1"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
 	"time"
 )
 

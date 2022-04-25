@@ -1,4 +1,4 @@
-module keikoproj.intuit.com/Flippy
+module github.com/keikoproj/flippy
 
 go 1.15
 

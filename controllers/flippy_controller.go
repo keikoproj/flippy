@@ -19,18 +19,18 @@ package controllers
 import (
 	"context"
 
+	"github.com/keikoproj/flippy/controllers/Reconciler"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"keikoproj.intuit.com/Flippy/controllers/Reconciler"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/k8s"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/utils"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sLog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	crdv1 "keikoproj.intuit.com/Flippy/api/v1"
+	crdv1 "github.com/keikoproj/flippy/api/v1"
 )
 
 // FlippyReconciler reconciles a FlippyConfig object

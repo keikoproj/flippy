@@ -2,10 +2,10 @@ package k8s
 
 import (
 	"context"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/utils"
 )
 
 func (K8sWrapper) GetNamespaces(clientset kubernetes.Interface) (*v1.NamespaceList, error) {
