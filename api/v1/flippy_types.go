@@ -43,7 +43,6 @@ type FlippyConfigSpec struct {
 }
 
 type RestartObject struct {
-
 	//Type of object to be restarted
 	Type string `json:"Type,omitempty"`
 
@@ -79,7 +78,6 @@ type K8S struct {
 }
 
 type FlippyCondition struct {
-
 	//Kubernetes Object
 	K8S K8S `json:"K8S,omitempty"`
 
@@ -91,7 +89,6 @@ type FlippyCondition struct {
 }
 
 type StatusCheckConfig struct {
-
 	//CheckStatus after
 	CheckStatus bool `json:"CheckStatus,omitempty"`
 

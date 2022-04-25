@@ -1,7 +1,7 @@
 package common
 
 import (
-	crdv1 "keikoproj.intuit.com/Flippy/api/v1"
+	crdv1 "github.com/keikoproj/flippy/api/v1"
 	"os"
 )
 

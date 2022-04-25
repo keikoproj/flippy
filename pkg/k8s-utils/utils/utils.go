@@ -6,12 +6,12 @@ import (
 	"os"
 
 	"github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
+	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/keikoproj/flippy/pkg/k8s-utils/config"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"keikoproj.intuit.com/Flippy/pkg/common"
-	"keikoproj.intuit.com/Flippy/pkg/k8s-utils/config"
 )
 
 func ConvertYamlToK8s(yamlFile []byte) (runtime.Object, error) {
