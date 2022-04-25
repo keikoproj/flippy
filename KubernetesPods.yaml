@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dev-devx-mpa-image-security-service-template-v2
+  annotations:
+    key: iam.amazonaws.com/role
+    value: "arn:aws:iam::733536204770:role/dev-devx-prd-jenkins"
+spec:
+  containers:
+    - name: podman
+      image: docker.intuit.com/oicp/standard/podman:v3.4.0
+      tty: true
+      command: [ "cat" ]
+      imagePullPolicy: Always
+      volumeMounts:
+        - name: container-storage
+          mountPath: /var/lib/containers
+      resources:
+        requests:
+          memory: "16Gi"
+      securityContext:
+        capabilities:
+          add: [ "SYS_ADMIN", "SYS_RESOURCE" ]
+    - name: cpd2
+      image: docker.intuit.com/oicp/standard/cpd2:1
+      tty: true
+      command: [ "cat" ]
+      imagePullPolicy: Always
+  volumes:
+    - name: container-storage
+      emptyDir: {}
