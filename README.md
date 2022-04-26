@@ -1,18 +1,21 @@
-# FLIPPY
-<!-- <p align="center">
-  <img src="<IMAGE PLACEHOLDER" width="500">
-</p> -->
+# Flippy
+Flippy is a kubernetes operator which restarts deployments that are Service Mesh enabled if the sidecar container’s docker image doesn’t match the expected docker image. This is useful for forcing Istio data plane upgrades after a control plane upgrade if required.
 
-<!-- 
-[![CircleCI]()]() 
-[![codecov]()]() -->
+# Why Flippy?
+
+There are two parts for mesh, the control plane and the data plane. The control plane changes are rolled out as a part of the IKS2 Istio add-on, but data plane changes occur with pod restarts. New sidecar containers are installed at the time pods are created. The control plane dictates which docker image gets installed as a sidecar container, but the Istio control plane does not rotate data plane pods.
+
+# How Flippy works?
 
 **Flippy provides automatic restart capability to pods based on configuration like image name change**
 
-Flippy was built to make upgrades and configuration updates easy on mesh enabled cluster. It provides capabilities to restart a POD( or Deployment etc) based on rules and preconditions based on custom resource called FlippyConfig.
+Flippy monitors a CRD which stores the desired container image. As configmap value changes flippy operators get triggered. Flippy operators examine deployments which are mesh enabled. It restarts the mesh-injected deployments one by one asynchronously, which doesn’t block the kubernetes cluster upgrade process.
+<BR>
+CRD have more wider filtering which can be used to solve more generic solutions instead of just istio/mesh targeted solutions.
 
-- [Flippy Demo Part 1 ](https://intuit.app.box.com/file/739739446822)
-- [Flippy Demo Part 2 ](https://intuit.app.box.com/file/739741720864)
+![Block Diagram](Docs/BlockDiagram.jpeg)
+
+
 
 <!-- ## [Docs](./docs/Index.md) -->
 
@@ -22,11 +25,11 @@ Organizations below are **officially** using Flippy. Please send a PR with your 
 
 * [Intuit](https://www.intuit.com/)
 
-<!-- 
+<!--
 ## Collaboration and Communication -->
 
 ## Contributing
-Refer to [Contributing doc](./CONTRIBUTING.md)
+Refer to [Contributing doc](./Docs/contributing.md)
 
 <!-- ## Release Cadence
 
