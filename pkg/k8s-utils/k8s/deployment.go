@@ -18,8 +18,7 @@ func (K8sWrapper) DeleteDeployment(clientset kubernetes.Interface, namespace str
 }
 
 func (K8sWrapper) GetDeployments(clientset kubernetes.Interface, namespace string) (*v1.DeploymentList, error) {
-	deploymentClient := clientset.AppsV1().Deployments(namespace)
-	deployments, err := deploymentClient.List(context.TODO(), metav1.ListOptions{})
+	deployments, err := clientset.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 	return deployments, err
 }
 
