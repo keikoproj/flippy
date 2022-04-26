@@ -34,8 +34,7 @@ func (K8sWrapper) GetRunningPods(clientset kubernetes.Interface, namespace strin
 func (K8sWrapper) GetAllPodsInNamespace(clientset kubernetes.Interface, namespace string) ([]corev1.Pod, error) {
 	var returnPodList []corev1.Pod
 
-	podclient := clientset.CoreV1().Pods(namespace)
-	podList, err := podclient.List(context.TODO(), metav1.ListOptions{})
+	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 
 	if err != nil {
 		return returnPodList, err
@@ -60,9 +59,8 @@ func (K8sWrapper) DeletePod(clientset kubernetes.Interface, namespace string, po
 	}
 	return nil
 }
-func (K8sWrapper) DeletePodsWithoutRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error {
-	podclient := clientset.CoreV1().Pods(namespace)
-	podList, err := podclient.List(context.TODO(), metav1.ListOptions{})
+func (K8sWrapper) DeletePodsWithRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error {
+	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 
 	if err != nil {
 		return err
@@ -81,41 +79,37 @@ func (K8sWrapper) DeletePodsWithoutRetry(clientset kubernetes.Interface, namespa
 	return nil
 }
 func (K8sWrapper) DeletePods(clientset kubernetes.Interface, namespace string, podNameContains string) error {
-	err := K8s.DeletePodsWithoutRetry(clientset, namespace, podNameContains)
+	err := K8s.DeletePodsWithRetry(clientset, namespace, podNameContains)
 	for i := 0; err != nil && i < 5; i++ {
-		err = K8s.DeletePodsWithoutRetry(clientset, namespace, podNameContains)
+		err = K8s.DeletePodsWithRetry(clientset, namespace, podNameContains)
 	}
 	return err
 }
 
 func (K8sWrapper) GetPodLogs(clientset kubernetes.Interface, podName string, namespace string, container string, fromTime Time) (string, error) {
-	podclient := clientset.CoreV1().Pods(namespace)
-
-	//noOfLine := int64(1)
-
 	logsAfter := metav1.NewTime(fromTime)
-	//var limitBytes int64
-	//limitBytes = 100
 
 	logOptions := corev1.PodLogOptions{
 		Container: container,
 		Follow:    false,
 		SinceTime: &logsAfter,
-		//TailLines: &noOfLine,
 	}
 
-	logReq := podclient.GetLogs(podName, &logOptions)
+	logReq := clientset.CoreV1().Pods(namespace).GetLogs(podName, &logOptions)
+
 	podLog, err := logReq.Stream(context.TODO())
 	if err != nil {
 		return "", err
 	}
+
 	defer podLog.Close()
+
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, podLog)
-
 	if err != nil {
 		return "", err
 	}
+
 	str := buf.String()
 	return str, err
 }

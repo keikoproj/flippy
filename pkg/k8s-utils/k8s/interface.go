@@ -24,15 +24,15 @@ type K8sAPI interface {
 	GetRunningPods(clientset kubernetes.Interface, namespace string, podNameContains string) ([]corev1.Pod, error)
 	GetAllPodsInNamespace(clientset kubernetes.Interface, namespace string) ([]corev1.Pod, error)
 	DeletePod(clientset kubernetes.Interface, namespace string, podName string) error
-	DeletePodsWithoutRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error
+	DeletePodsWithRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error
 	DeletePods(clientset kubernetes.Interface, namespace string, podNameContains string) error
 	GetPodLogs(clientset kubernetes.Interface, podName string, namespace string, container string, fromTime time.Time) (string, error)
 	RestartContainers(clientset kubernetes.Interface, kubeconfigpath string, namespace string, podnamecontains string, containerName string) (string, error)
 	GetLogFromFirstPod(clientset kubernetes.Interface, namespace string, podNameContains string, containerName string, logsFromTime time.Time) (string, error)
 
 	CreateNetworkPolicy(clientset kubernetes.Interface, networkpolicy *networkingv1.NetworkPolicy, namespace string) error
-	DeleteNetworkPolicy(clientset kubernetes.Interface, namespace string, networkpolicyname string) error
-	CreateNetworkPolicyWithCustomization(clientset kubernetes.Interface, networkpolicy *networkingv1.NetworkPolicy, namespace string, podSelector map[string]string) error
+	//DeleteNetworkPolicy(clientset kubernetes.Interface, namespace string, networkpolicyname string) error
+	//CreateNetworkPolicyWithCustomization(clientset kubernetes.Interface, networkpolicy *networkingv1.NetworkPolicy, namespace string, podSelector map[string]string) error
 
 	GetNamespaces(clientset kubernetes.Interface) (*corev1.NamespaceList, error)
 	GetNamespaceWithLabelFilter(clientset kubernetes.Interface, labels map[string]string) ([]string, error)

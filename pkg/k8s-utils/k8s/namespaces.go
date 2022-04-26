@@ -9,8 +9,7 @@ import (
 )
 
 func (K8sWrapper) GetNamespaces(clientset kubernetes.Interface) (*v1.NamespaceList, error) {
-	namespaceClient := clientset.CoreV1().Namespaces()
-	namespaces, err := namespaceClient.List(context.TODO(), metav1.ListOptions{})
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
