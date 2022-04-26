@@ -1,0 +1,16 @@
+version: "3"
+domain: keikoproj.io
+layout:
+- go.kubebuilder.io/v3
+projectName: flippy
+repo: https://github.com/keikoproj/flippy
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: my.domain
+  group: webapp
+  kind: Guestbook
+  path: github.com/keikoproj/flippy/api/v1
+  version: v1
