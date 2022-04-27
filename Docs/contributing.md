@@ -35,8 +35,12 @@ Please install [kubectl tool](https://kubernetes.io/docs/tasks/tools/#kubectl)
 1. Specify kubernetes cluster config<br>
 `export KUBECONFIG=<CONFIGFILE>`
 
-2. Install sample crd to kubernetes cluster<br>
+2. Install crd to kubernetes cluster<br>
 `kubectl apply -f config/crd/bases/keikoproj.io_flippyconfigs.yaml`
 
 3. Building operator binary<br>
 `go build -a -o manager main.go`
+
+<hr>
+
+#### [Installation Docs](install.md)

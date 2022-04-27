@@ -15,9 +15,7 @@ CRD have more wider filtering which can be used to solve more generic solutions 
 
 ![Block Diagram](Docs/BlockDiagram.jpeg)
 
-
-
-<!-- ## [Docs](./docs/Index.md) -->
+## [Docs](./Docs/index.md)
 
 ## Who uses Flippy?
 
@@ -25,12 +23,7 @@ Organizations below are **officially** using Flippy. Please send a PR with your 
 
 * [Intuit](https://www.intuit.com/)
 
-<!--
-## Collaboration and Communication -->
 
 ## Contributing
-Refer to [Contributing doc](./Docs/contributing.md)
+Refer to [Contributing doc](./Docs/contributing.md) <br>
 
-<!-- ## Release Cadence
-
-Details can be found [here](./docs/Processes.md) -->
