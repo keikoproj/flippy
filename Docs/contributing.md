@@ -43,4 +43,4 @@ Please install [kubectl tool](https://kubernetes.io/docs/tasks/tools/#kubectl)
 
 <hr>
 
-#### [Installation Docs](./docs/install.md)
+#### [Installation Docs](install.md)
