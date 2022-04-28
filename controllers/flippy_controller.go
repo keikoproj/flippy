@@ -45,7 +45,7 @@ type FlippyReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
+// Reconcile function compares the state specified by
 // the FlippyConfig object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
@@ -55,7 +55,6 @@ type FlippyReconciler struct {
 func (r *FlippyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = k8sLog.FromContext(ctx)
 
-	// your logic here
 	result := crdv1.FlippyConfig{
 		TypeMeta:   v1.TypeMeta{},
 		ObjectMeta: v1.ObjectMeta{},

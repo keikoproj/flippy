@@ -174,7 +174,7 @@ func (k K8sWrapperFakeSuccess) DeletePod(clientset kubernetes.Interface, namespa
 	panic("implement me")
 }
 
-func (k K8sWrapperFakeSuccess) DeletePodsWithoutRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error {
+func (k K8sWrapperFakeSuccess) DeletePodsWithRetry(clientset kubernetes.Interface, namespace string, podNameContains string) error {
 	panic("implement me")
 }
 
