@@ -72,6 +72,6 @@ Example -
         MaxRetry: 10
         RetryDuration: 30
   ```
-This will watch all Kubernetes Deployment and Argo Rollouts which matches [#1](#1-processfilter) & [#2](#2-imagelist)
+This will watch all [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) and [Argo Rollouts](https://argoproj.github.io/argo-rollouts/) which matches [#1](#1-processfilter) & [#2](#2-imagelist)
 
  Feel free to refer [Sample Flippy Config](../sample/sample.yaml).
