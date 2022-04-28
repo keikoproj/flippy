@@ -61,5 +61,7 @@ Example - <br>
 <HR>
 
 Feel free to refer sample [Example deployment](../sample/deployment.yaml).
+
+Feel free to refer sample [Flippy Config](../sample/sample.yaml)
  
 

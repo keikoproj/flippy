@@ -1,14 +1,13 @@
-apiVersion: keikoproj.intuit.com/v1
+apiVersion: keikoproj.io/v1
 kind: FlippyConfig
 metadata:
   name: flippy-sample
   namespace: istio-system
 spec:
   # Add fields here
-  foo: bar1
   ImageList:
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:intuit_master-1.10.4-01599
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:intuit_master-1.10.4-foo
+    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:mesh-1662wasmpoc-cf2b1
+    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:patch-1.10.42-boo
   PostFilterRestarts:
     - K8S:
         Type: Deployment

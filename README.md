@@ -1,5 +1,6 @@
 # Flippy
 [![Go Report Card](https://goreportcard.com/badge/github.com/keikoproj/flippy)](https://goreportcard.com/report/github.com/keikoproj/flippy)
+[![codecov](https://codecov.io/gh/keikoproj/flippy/branch/master/graph/badge.svg)](https://codecov.io/gh/keikoproj/flippy)
 
 Flippy is a kubernetes operator which restarts deployments that are Service Mesh enabled if the sidecar container’s docker image doesn’t match the expected docker image. This is useful for forcing Istio data plane upgrades after a control plane upgrade if required.
 
@@ -16,6 +17,12 @@ Flippy monitors a CRD which stores the desired container image. As configmap val
 CRD have more wider filtering which can be used to solve more generic solutions instead of just istio/mesh targeted solutions.
 
 ![Block Diagram](Docs/BlockDiagram.jpeg)
+
+### Demo
+
+Flippy demoed in Service Mesh end-user community. Please feel to [watch the demo](https://youtu.be/Ll68AF3NZjw). 
+
+We demoed the old version based upon [Kubernetes ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). We have improved over time and provided more advanced filters and support with [Kubernetes CRD-based](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions) approach.
 
 ## [Docs](./Docs/index.md)
 
