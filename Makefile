@@ -50,7 +50,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 tests:
-	go test ./... -coverprofile cover.out
+	go test ./... -coverprofile coverage.txt
 
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: manifests generate fmt vet ## Run tests.
