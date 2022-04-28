@@ -23,8 +23,8 @@ This section dictates desire docker image(s). Flippy will mark deployment(s)/pod
 Example -
   ```
   ImageList:
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:mesh-1662wasmpoc-cf2b1
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:patch-1.10.42-boo
+    - docker.intuit.com/flippy/sample:abc
+    - docker.intuit.com/flippy/sample:pqr
   ```
 ##### 3. Preconditions:
 This section dictates wait condition before processing any restart. <br>

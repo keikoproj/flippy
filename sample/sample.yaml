@@ -6,8 +6,8 @@ metadata:
 spec:
   # Add fields here
   ImageList:
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:mesh-1662wasmpoc-cf2b1
-    - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:patch-1.10.42-boo
+    - docker.intuit.com/flippy/sample:abc
+    - docker.intuit.com/flippy/sample:pqr
   PostFilterRestarts:
     - K8S:
         Type: Deployment
