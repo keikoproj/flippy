@@ -2,6 +2,7 @@
 
 ![Block Diagram](FlowDiagram.jpeg)
 <HR>
+
 ### Description for Flippy Config
 
 ##### 1. ProcessFilter:
@@ -18,15 +19,13 @@ Example -
 ```
 This will filter pod(s)/deployment(s) which  has container name `istio-proxy`, contains label `"istio-injection": "enabled"` and has annotation `"sidecar.istio.io/inject": "true"`
 ##### 2. ImageList
-This section dictates desire docker image(s). Flippy will mark deployment(s)/pod(s) for restart if container image doesn't match any of the below.<br>
+This section dictates desire docker image(s). Flippy will mark deployment(s)/pod(s) for restart if container image doesn't match to any thing from list for condition specified in [#1](#1-processfilter).<br>
 Example -
   ```
   ImageList:
     - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:mesh-1662wasmpoc-cf2b1
     - docker.intuit.com/strategic/services/service-mesh/service/proxyv2:patch-1.10.42-boo
-
-  ```    
-This will filter pod(s)/deployment(s) which doesn't have any of mentioned docker images for condition specified in #1
+  ```
 ##### 3. Preconditions:
 This section dictates wait condition before processing any restart. <br>
 Example -
@@ -41,7 +40,7 @@ Example -
         MaxRetry: 10
         RetryDuration: 30
   ```
-This will wait & check `istiod` deployment under `istio-system` to be healthy before procedding any restart.
+This will wait & check `istiod` deployment under `istio-system` to be healthy before proceeding any restart.
 ##### 4. PostFilterRestarts:
 This section dictates action which needs to be perform before restarting any deployment(s) from generated list. <br>
 Example -
@@ -57,8 +56,8 @@ Example -
         RetryDuration: 30
   ```
 This will restart `istio-ingressgateway` deployement under `istio-system` namespace before processing any restart(s) from generated list.
-##### 4. RestartObjects:
-This section dictates what are the kubenetes object needs to be asserted for generating list.<br>
+##### 5. RestartObjects:
+This section dictates which kubenetes object needs to be asserted for generating list.<br>
 Example -
   ```
   RestartObjects:
@@ -73,6 +72,6 @@ Example -
         MaxRetry: 10
         RetryDuration: 30
   ```
-This will watch all Kubernetes Deployment and Argo Rollouts which matches  #1 & #2
+This will watch all Kubernetes Deployment and Argo Rollouts which matches [#1](#1-processfilter) & [#2](#2-imagelist)
 
- Feel free to refer sample [Flippy Config](../sample/sample.yaml)
+ Feel free to refer [Sample Flippy Config](../sample/sample.yaml).
