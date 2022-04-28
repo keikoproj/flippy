@@ -1,4 +1,6 @@
 # Flippy
+[![Go Report Card](https://goreportcard.com/badge/github.com/keikoproj/flippy)](https://goreportcard.com/report/github.com/keikoproj/flippy)
+
 Flippy is a kubernetes operator which restarts deployments that are Service Mesh enabled if the sidecar container’s docker image doesn’t match the expected docker image. This is useful for forcing Istio data plane upgrades after a control plane upgrade if required.
 
 # Why Flippy?

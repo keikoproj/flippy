@@ -2,7 +2,7 @@ name: unit-test
 
 on:
   push:
-    branches: [ fix-test-cases ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
