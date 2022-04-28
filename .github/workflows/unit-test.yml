@@ -30,4 +30,4 @@ jobs:
 
     - name: Test
       run: |
-        make test
+        make tests
