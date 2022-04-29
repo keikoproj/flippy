@@ -4,3 +4,5 @@
 
 #### [Examples Installation](install.md)
 
+#### [Flippy Operator Flow](flow.md)
+
