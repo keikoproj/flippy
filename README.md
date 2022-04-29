@@ -20,7 +20,7 @@ CRD have more wider filtering which can be used to solve more generic solutions 
 
 ### Demo
 
-Flippy demoed in Service Mesh end-user community. Please feel to [watch the demo](https://youtu.be/Ll68AF3NZjw).
+Flippy demoed in Service Mesh end-user community. Please feel free to [watch the demo](https://youtu.be/Ll68AF3NZjw).
 
 We demoed the old version which was based upon [Kubernetes ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/). We have improved over time and provided more advanced filters and support with [Kubernetes CRD-based](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions) approach.
 
