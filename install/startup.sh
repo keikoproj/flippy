@@ -9,7 +9,7 @@ retry_count=1
 
 while [[ $kube_system_pod_count -le 0 ]] && [[ $retry_count -le $max_retry_count ]]
 do
-    sleep 3
+    sleep 60
     kube_system_pod_count=$(kubectl get pod -n kube-system | wc -l)
     retry_count=$(($retry_count+1))
 done
