@@ -6,33 +6,20 @@ import (
 	argo "github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
 	"github.com/keikoproj/flippy/pkg/k8s-utils/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	//"fmt"
-	"os/exec"
-	"strings"
 )
 
 func (K8sWrapper) RolloutRestartArgoRollouts(kubeconfigpath string, namespace string, argoRolloutName string) (string, error) {
-	output, err := exec.Command("kubectl", "argo", "rollouts", "--kubeconfig="+kubeconfigpath, "-n", namespace, "restart", argoRolloutName).CombinedOutput()
 
-	if err != nil || strings.Contains(string(output), "Unable to use a TTY") {
-		return "", err
-	} else {
-		return string(output), nil
-	}
+	var args []string
+	args = append(args, "argo", "rollouts", "--kubeconfig="+kubeconfigpath, "-n", namespace, "restart", argoRolloutName)
+	return K8s.ExecuteKubectlCommand(args)
 }
 
 func (K8sWrapper) RolloutArogRolloutStatus(kubeconfigpath string, namespace string, argoRolloutName string) (string, error) {
 
 	var args []string
 	args = append(args, "argo", "rollouts", "--kubeconfig="+kubeconfigpath, "status", "-n", namespace, argoRolloutName, "--watch=false")
-	output, err := exec.Command("kubectl", args...).CombinedOutput()
-
-	if err != nil || strings.Contains(string(output), "Unable to use a TTY") {
-		return string(output), err
-	} else {
-		return string(output), nil
-	}
+	return K8s.ExecuteKubectlCommand(args)
 }
 
 func (K8sWrapper) GetArgoRollouts(clientset argo.Interface, namespace string) (*v1alpha1.RolloutList, error) {

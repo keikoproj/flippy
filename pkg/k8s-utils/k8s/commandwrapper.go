@@ -1,38 +1,46 @@
 package k8s
 
 import (
+	"errors"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
 )
 
-func (K8sWrapper) PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) error {
-	_, err := exec.Command("kubectl", "patch", "--kubeconfig="+kubeconfigpath, "-n", namespace, resource, resourceName, "-p", patchJson, "--type", "json").CombinedOutput()
-
-	return err
+func (K8sWrapper) PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) (string, error) {
+	var args []string
+	args = append(args, "patch", "--kubeconfig="+kubeconfigpath, "-n", namespace, resource, resourceName, "-p", patchJson, "--type", "json")
+	return K8s.ExecuteKubectlCommand(args)
 }
 
-func (K8sWrapper) ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) error {
-	_, err := exec.Command("kubectl", "scale", "--kubeconfig="+kubeconfigpath, "-n", namespace, "deployment/"+deploymentname,
-		"--replicas="+strconv.Itoa(scale)).CombinedOutput()
+func (K8sWrapper) ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) (string, error) {
 
-	return err
+	var args []string
+	args = append(args, "scale", "--kubeconfig="+kubeconfigpath, "-n", namespace, "deployment/"+deploymentname,
+		"--replicas="+strconv.Itoa(scale))
+
+	return K8s.ExecuteKubectlCommand(args)
 }
 
-func (K8sWrapper) ApplyYaml(kubeconfigpath string, yamlFilePath string) error {
-	_, err := exec.Command("kubectl", "--kubeconfig="+kubeconfigpath, "apply", "-f", yamlFilePath).CombinedOutput()
-	return err
+func (K8sWrapper) ApplyYaml(kubeconfigpath string, yamlFilePath string) (string, error) {
+	var args []string
+	args = append(args, "--kubeconfig="+kubeconfigpath, "apply", "-f", yamlFilePath)
+	return K8s.ExecuteKubectlCommand(args)
 }
 
-func (K8sWrapper) DeleteYaml(kubeconfigpath string, yamlFilePath string) error {
-	_, err := exec.Command("kubectl", "--kubeconfig="+kubeconfigpath, "delete", "-f", yamlFilePath).CombinedOutput()
-	return err
+func (K8sWrapper) DeleteYaml(kubeconfigpath string, yamlFilePath string) (string, error) {
+	var args []string
+	args = append(args, "--kubeconfig="+kubeconfigpath, "delete", "-f", yamlFilePath)
+	return K8s.ExecuteKubectlCommand(args)
 }
 
 func (K8sWrapper) GetServiceEntries(kubeconfigpath string, namespace string) (map[string]string, error) {
 	var serviceEntriesMap map[string]string
 	serviceEntriesMap = make(map[string]string)
-	output, err := exec.Command("kubectl", "--kubeconfig="+kubeconfigpath, "get", "se", "-n", namespace).CombinedOutput()
+	var args []string
+	args = append(args, "--kubeconfig="+kubeconfigpath, "get", "se", "-n", namespace)
+	output, err := K8s.ExecuteKubectlCommand(args)
 	if err != nil {
 		return serviceEntriesMap, err
 	}
@@ -56,34 +64,35 @@ func (K8sWrapper) GetServiceEntries(kubeconfigpath string, namespace string) (ma
 func (K8sWrapper) RestartContainer(kubeconfigpath string, namespace string, podname string, containerName string) (string, error) {
 	//This is achieved by killing container process. K8S will start container due to deployment spec.
 
-	output, err := exec.Command("kubectl", "exec", "-it", podname, "--kubeconfig="+kubeconfigpath, "-n", namespace, "-c", containerName, "--", "/bin/bash", "-c", "kill 1").CombinedOutput()
+	var args []string
+	args = append(args, "exec", "-it", podname, "--kubeconfig="+kubeconfigpath, "-n", namespace, "-c", containerName, "--", "/bin/bash", "-c", "kill 1")
 
-	if err != nil || strings.Contains(string(output), "Unable to use a TTY") {
-		return "", err
-	} else {
-		return string(output), err
-	}
+	return K8s.ExecuteKubectlCommand(args)
 }
 
 func (K8sWrapper) RolloutRestartDeployment(kubeconfigpath string, namespace string, deploymentName string) (string, error) {
-	output, err := exec.Command("kubectl", "--kubeconfig="+kubeconfigpath, "-n", namespace, "rollout", "restart", "deployment", deploymentName).CombinedOutput()
+	var args []string
+	args = append(args, "--kubeconfig="+kubeconfigpath, "-n", namespace, "rollout", "restart", "deployment", deploymentName)
 
-	if err != nil || strings.Contains(string(output), "Unable to use a TTY") {
-		return "", err
-	} else {
-		return string(output), nil
-	}
+	return K8s.ExecuteKubectlCommand(args)
 }
 
 func (K8sWrapper) RolloutDeploymentStatus(kubeconfigpath string, namespace string, deploymentName string) (string, error) {
 
 	var args []string
 	args = append(args, "--kubeconfig="+kubeconfigpath, "-n", namespace, "rollout", "status", "deployment", deploymentName, "--watch=false")
-	output, err := exec.Command("kubectl", args...).CombinedOutput()
 
-	if err != nil || strings.Contains(string(output), "Unable to use a TTY") {
-		return string(output), err
-	} else {
-		return string(output), nil
+	return K8s.ExecuteKubectlCommand(args)
+}
+
+func (K8sWrapper) ExecuteKubectlCommand(cmdParameter []string) (string, error) {
+
+	output, err := exec.Command("kubectl", cmdParameter...).CombinedOutput()
+
+	if err != nil {
+		err = errors.New(fmt.Sprintf("Failed to execute - kubectl %s, Console Output - %s", strings.Join(cmdParameter, " "), output))
 	}
+
+	return string(output), err
+
 }
