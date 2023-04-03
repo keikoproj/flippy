@@ -138,19 +138,23 @@ func (k K8sWrapperFakeSuccess) RolloutArogRolloutStatus(kubeconfigpath string, n
 	}
 }
 
-func (k K8sWrapperFakeSuccess) PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) error {
+func (k K8sWrapperFakeSuccess) ExecuteKubectlCommand(cmdParameter []string) (string, error) {
 	panic("implement me")
 }
 
-func (k K8sWrapperFakeSuccess) ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) error {
+func (k K8sWrapperFakeSuccess) PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) (string, error) {
 	panic("implement me")
 }
 
-func (k K8sWrapperFakeSuccess) ApplyYaml(kubeconfigpath string, yamlFilePath string) error {
+func (k K8sWrapperFakeSuccess) ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) (string, error) {
 	panic("implement me")
 }
 
-func (k K8sWrapperFakeSuccess) DeleteYaml(kubeconfigpath string, yamlFilePath string) error {
+func (k K8sWrapperFakeSuccess) ApplyYaml(kubeconfigpath string, yamlFilePath string) (string, error) {
+	panic("implement me")
+}
+
+func (k K8sWrapperFakeSuccess) DeleteYaml(kubeconfigpath string, yamlFilePath string) (string, error) {
 	panic("implement me")
 }
 

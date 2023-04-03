@@ -12,10 +12,10 @@ import (
 )
 
 type K8sAPI interface {
-	PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) error
-	ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) error
-	ApplyYaml(kubeconfigpath string, yamlFilePath string) error
-	DeleteYaml(kubeconfigpath string, yamlFilePath string) error
+	PatchResource(kubeconfigpath string, namespace string, resource string, resourceName string, patchJson string) (string, error)
+	ScaleDeployment(kubeconfigpath string, namespace string, deploymentname string, scale int) (string, error)
+	ApplyYaml(kubeconfigpath string, yamlFilePath string) (string, error)
+	DeleteYaml(kubeconfigpath string, yamlFilePath string) (string, error)
 	GetServiceEntries(kubeconfigpath string, namespace string) (map[string]string, error)
 	RestartContainer(kubeconfigpath string, namespace string, podname string, containerName string) (string, error)
 	RolloutRestartDeployment(kubeconfigpath string, namespace string, deploymentName string) (string, error)
@@ -54,6 +54,8 @@ type K8sAPI interface {
 
 	ReadConfigMap(clientset kubernetes.Interface, namespace string, configMapName string) (*corev1.ConfigMap, error)
 	ReadConfigMapData(clientset kubernetes.Interface, namespace string, configMapName string) (map[string]string, error)
+
+	ExecuteKubectlCommand(cmdParameter []string) (string, error)
 }
 
 type K8sWrapper struct{}

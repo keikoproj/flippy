@@ -60,7 +60,7 @@ func (RestartDeploymentWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, resta
 
 	if err != nil {
 		logFields[common.RETRY_COUNT] = retryCount
-		log.WithFields(logFields).Error("Failed to fetch status")
+		log.WithFields(logFields).Error("Failed to fetch status", err)
 	}
 
 	if !IsRestartGood(output) {
@@ -102,7 +102,7 @@ func (RestartRolloutWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, restartC
 
 	if err != nil {
 		logFields[common.RETRY_COUNT] = retryCount
-		log.WithFields(logFields).Error("Failed to fetch status")
+		log.WithFields(logFields).Error("Failed to fetch status", err)
 	}
 
 	if !IsRestartGood(output) {
