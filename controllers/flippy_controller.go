@@ -86,7 +86,6 @@ func (r *FlippyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	Reconciler.Process.Handle(result, clientSetWrapper, k8s.K8s)
 
 	return ctrl.Result{RequeueAfter: r.ReconcileTime}, nil
-	//return ReturnControllerWithRequeue()
 }
 
 // SetupWithManager sets up the controller with the Manager.
