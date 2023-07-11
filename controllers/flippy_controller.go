@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/keikoproj/flippy/controllers/Reconciler"
 	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
@@ -36,7 +37,8 @@ import (
 // FlippyReconciler reconciles a FlippyConfig object
 type FlippyReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	ReconcileTime time.Duration
 }
 
 //+kubebuilder:rbac:groups=webapp.my.domain,resources=guestbooks,verbs=get;list;watch;create;update;patch;delete
@@ -83,7 +85,7 @@ func (r *FlippyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	clientSetWrapper := k8s.ClientSet{K8sClientSet: clientset, ArgoRolloutClientSet: argoclientset}
 	Reconciler.Process.Handle(result, clientSetWrapper, k8s.K8s)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.ReconcileTime}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
