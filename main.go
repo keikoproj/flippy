@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"github.com/keikoproj/flippy/pkg/common"
 	"os"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -51,11 +52,14 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var flagReconcilerTime string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&flagReconcilerTime, "reconciler-time", "10h", "The flippy reconciler time.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -77,8 +81,9 @@ func main() {
 	}
 
 	if err = (&controllers.FlippyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ReconcileTime: common.GetReconcileDuration(flagReconcilerTime),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FlippyConfig")
 		os.Exit(1)

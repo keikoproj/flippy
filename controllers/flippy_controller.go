@@ -18,8 +18,6 @@ package controllers
 
 import (
 	"context"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/keikoproj/flippy/controllers/Reconciler"
@@ -39,7 +37,8 @@ import (
 // FlippyReconciler reconciles a FlippyConfig object
 type FlippyReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	ReconcileTime time.Duration
 }
 
 //+kubebuilder:rbac:groups=webapp.my.domain,resources=guestbooks,verbs=get;list;watch;create;update;patch;delete
@@ -86,7 +85,8 @@ func (r *FlippyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	clientSetWrapper := k8s.ClientSet{K8sClientSet: clientset, ArgoRolloutClientSet: argoclientset}
 	Reconciler.Process.Handle(result, clientSetWrapper, k8s.K8s)
 
-	return ReturnControllerWithRequeue()
+	return ctrl.Result{RequeueAfter: r.ReconcileTime}, nil
+	//return ReturnControllerWithRequeue()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -94,22 +94,4 @@ func (r *FlippyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&crdv1.FlippyConfig{}).
 		Complete(r)
-}
-
-func ReturnControllerWithRequeue() (ctrl.Result, error) {
-
-	requeueAfter := os.Getenv("REQUEUE_AFTER_HOUR")
-
-	if requeueAfter == "" {
-		log.Info("Setting REQUEUE_AFTER_HOUR to default (10 hrs)")
-		return ctrl.Result{}, nil
-	} else {
-		requeueAfterInt, err := strconv.Atoi(requeueAfter)
-		if err != nil {
-			log.Error("Failed to parse REQUEUE_AFTER_HOUR. Setting to default (10 hrs) ", requeueAfter, " Error - ", err)
-			return ctrl.Result{}, nil
-		}
-		log.Info("Setting REQUEUE_AFTER_HOUR to " + string(requeueAfterInt) + " hrs as configured.")
-		return ctrl.Result{RequeueAfter: time.Duration(requeueAfterInt) * time.Hour}, nil
-	}
 }

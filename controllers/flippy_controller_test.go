@@ -1,12 +1,5 @@
 package controllers
 
-import (
-	"gotest.tools/v3/assert"
-	"os"
-	"testing"
-	"time"
-)
-
 //
 //import (
 //	"context"
@@ -66,44 +59,3 @@ import (
 //		})
 //	}
 //}
-
-func TestReturnControllerWithRequeueUnset(t *testing.T) {
-	result, _ := ReturnControllerWithRequeue()
-	assert.Equal(t, result.RequeueAfter, time.Duration(0)*time.Second)
-}
-
-func TestReturnControllerWithRequeueSetEmpty(t *testing.T) {
-	os.Setenv("REQUEUE_AFTER_HOUR", "")
-
-	result, _ := ReturnControllerWithRequeue()
-	assert.Equal(t, result.RequeueAfter, time.Duration(0)*time.Second)
-
-	os.Unsetenv("REQUEUE_AFTER_HOUR")
-}
-
-func TestReturnControllerWithRequeueSetGarbage(t *testing.T) {
-	os.Setenv("REQUEUE_AFTER_HOUR", "Garbage")
-
-	result, _ := ReturnControllerWithRequeue()
-	assert.Equal(t, result.RequeueAfter, time.Duration(0)*time.Second)
-
-	os.Unsetenv("REQUEUE_AFTER_HOUR")
-}
-
-func TestReturnControllerWithRequeueSetZero(t *testing.T) {
-	os.Setenv("REQUEUE_AFTER_HOUR", "0")
-
-	result, _ := ReturnControllerWithRequeue()
-	assert.Equal(t, result.RequeueAfter, time.Duration(0)*time.Second)
-
-	os.Unsetenv("REQUEUE_AFTER_HOUR")
-}
-
-func TestReturnControllerWithRequeueSetNonZeror(t *testing.T) {
-	os.Setenv("REQUEUE_AFTER_HOUR", "8760")
-
-	result, _ := ReturnControllerWithRequeue()
-	assert.Equal(t, result.RequeueAfter, time.Duration(8760)*time.Hour)
-
-	os.Unsetenv("REQUEUE_AFTER_HOUR")
-}

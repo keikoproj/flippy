@@ -35,4 +35,4 @@ else
     echo "[success] Found Kubernetes context."
 fi
 
-/workspace/manager
+/workspace/manager "$@"
