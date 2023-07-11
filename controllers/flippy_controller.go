@@ -109,6 +109,7 @@ func ReturnControllerWithRequeue() (ctrl.Result, error) {
 			log.Error("Failed to parse REQUEUE_AFTER_HOUR. Setting to default (10 hrs) ", requeueAfter, " Error - ", err)
 			return ctrl.Result{}, nil
 		}
+		log.Info("Setting REQUEUE_AFTER_HOUR to " + string(requeueAfterInt) + " hrs as configured.")
 		return ctrl.Result{RequeueAfter: time.Duration(requeueAfterInt) * time.Hour}, nil
 	}
 }
