@@ -23,3 +23,5 @@ type RestartObjects struct {
 	NamespaceObjects map[string][]string
 	RestartConfig    crdv1.StatusCheckConfig
 }
+
+var IgnoreMetadata string

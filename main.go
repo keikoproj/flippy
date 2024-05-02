@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"github.com/keikoproj/flippy/pkg/common"
 	"os"
 	"time"
 
@@ -61,6 +62,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.DurationVar(&flagReconcilerTime, "reconciler-time", 10*time.Hour, "The flippy reconciler time.")
+	flag.StringVar(&common.IgnoreMetadata, "ignore-metadata", "flippy-ignore", "Annotation (Rollout/Deployment) and Label (Namespace) to be ignored")
 
 	opts := zap.Options{
 		Development: true,

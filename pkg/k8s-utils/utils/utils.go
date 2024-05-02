@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/argoproj/argo-rollouts/pkg/client/clientset/versioned"
 	"github.com/keikoproj/flippy/pkg/common"
@@ -73,6 +74,12 @@ func StringArrayContains(s []string, str string) bool {
 }
 
 func IsStringMapSubset(masterMap map[string]string, subsetMap map[string]string) bool {
+	flippyIgnore, ok := masterMap[common.IgnoreMetadata]
+
+	if ok && strings.ToLower(flippyIgnore) == "true" {
+		return false
+	}
+
 	match := 0
 	for key, value := range subsetMap {
 		masterValue, ok := masterMap[key]
