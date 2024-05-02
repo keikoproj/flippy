@@ -24,4 +24,4 @@ type RestartObjects struct {
 	RestartConfig    crdv1.StatusCheckConfig
 }
 
-var IgnoreMetadata string
+var IgnoreMetadataKey string

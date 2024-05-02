@@ -74,7 +74,7 @@ func StringArrayContains(s []string, str string) bool {
 }
 
 func IsStringMapSubset(masterMap map[string]string, subsetMap map[string]string) bool {
-	flippyIgnore, ok := masterMap[common.IgnoreMetadata]
+	flippyIgnore, ok := masterMap[common.IgnoreMetadataKey]
 
 	if ok && strings.ToLower(flippyIgnore) == "true" {
 		return false

@@ -29,7 +29,7 @@ func TestIsStringMapSubset(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args != "empty" {
-				common.IgnoreMetadata = tt.args
+				common.IgnoreMetadataKey = tt.args
 			}
 			if got := IsStringMapSubset(masterMap, subsetMap); got != tt.want {
 				t.Errorf("IsStringMapSubset() = %v, want %v", got, tt.want)

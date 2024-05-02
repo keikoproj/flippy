@@ -62,7 +62,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.DurationVar(&flagReconcilerTime, "reconciler-time", 10*time.Hour, "The flippy reconciler time.")
-	flag.StringVar(&common.IgnoreMetadata, "ignore-metadata", "flippy-ignore", "Annotation (Rollout/Deployment) and Label (Namespace) to be ignored")
+	flag.StringVar(&common.IgnoreMetadataKey, "flippy-ignore-key", "flippy-ignore", "Annotation (Rollout/Deployment) and Label (Namespace) to be ignored")
 
 	opts := zap.Options{
 		Development: true,
