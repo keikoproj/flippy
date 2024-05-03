@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/keikoproj/flippy/pkg/common"
+	"github.com/tj/assert"
 	"testing"
 )
 
@@ -36,4 +37,19 @@ func TestIsStringMapSubset(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsStringMapSubsetNegative(t *testing.T) {
+
+	masterMap := make(map[string]string)
+	masterMap["test1"] = "test"
+	masterMap["test2"] = ""
+	masterMap["test3"] = "true"
+	masterMap["test4"] = "false"
+
+	subsetMap := make(map[string]string)
+	subsetMap["test5"] = "test"
+
+	got := IsStringMapSubset(masterMap, subsetMap)
+	assert.Equal(t, false, got)
 }
