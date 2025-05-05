@@ -6,6 +6,7 @@
 *.dylib
 *.wasm
 *.DS_Store
+flippy
 
 # Test binary, built with `go test -c`
 *.test

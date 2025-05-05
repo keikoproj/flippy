@@ -1,4 +1,4 @@
-FROM golang:1.19.5-alpine3.17 as builder
+FROM golang:1.24-alpine3.19 as builder
 
 USER root
 
