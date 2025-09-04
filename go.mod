@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/argoproj/argo-rollouts v1.8.2
 	github.com/sirupsen/logrus v1.9.3
-	github.com/tj/assert v0.0.3
+	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0
 	k8s.io/client-go v0.33.0
@@ -46,7 +46,7 @@ require (
 	github.com/prometheus/common v0.63.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect

@@ -21,3 +21,6 @@ manager
 # Dependency directories (remove the comment below to include it)
 # vendor/
 .idea
+
+# Unit test documentation (excluded from version control)
+unit-test-notes/
