@@ -50,9 +50,11 @@ func (ReconcilerWrapper) IsProxyVersionChange(imageList []string) bool {
 	}
 
 	if len(dockerImages) == 0 {
+		log.Info("Desire container list not matched. Current - ", dockerImages, " Desire - ", imageList)
 		dockerImages = imageList
 		return true
 	} else if len(dockerImages) != len(imageList) {
+		log.Info("Desire container list not matched. Current - ", dockerImages, " Desire - ", imageList)
 		dockerImages = imageList
 		return true
 	} else {
@@ -67,6 +69,8 @@ func (ReconcilerWrapper) IsProxyVersionChange(imageList []string) bool {
 			log.Info("Desire container list matched. Current - ", dockerImages, " Desire - ", imageList)
 			return false
 		} else {
+			log.Info("Desire container list not matched. Current - ", dockerImages, " Desire - ", imageList)
+			dockerImages = imageList
 			return true
 		}
 	}
