@@ -66,10 +66,15 @@ Example - <br>
       - name: FLIPPY_STAGGER_NAMESPACES
         value: "true"
     ```
-   When enabled, Flippy processes namespaces one at a time in sorted order and only moves to the next namespace
-   after every restarted object in the current namespace reports healthy or exhausts its retries. The health wait
+   When enabled, Flippy processes namespaces one at a time in sorted order. Within a namespace each object is
+   restarted and then waited on until it reports healthy or exhausts its retries before the next object is
+   restarted, and the next namespace starts only after the current one is fully processed. The health wait
    is forced even if the `RestartObjects[].StatusCheckConfig.CheckStatus` field is `false`; `MaxRetry` and
    `RetryDuration` are taken from that config when set, otherwise default to 10 retries every 30 seconds.
+   Flippy also pauses one `RetryDuration` after each restart before the first status poll so a stale
+   "Healthy" status cannot release the gate. If the restart command itself fails (for example the object was
+   deleted), the wait is skipped for that object. Because the wait is sequential, a staggered run can keep a
+   single reconcile busy for a long time; this is expected.
    Any value other than `true`/`1` (including unset or invalid) leaves the default behavior unchanged.
    This slows down the overall rollout, so enable it only on clusters that need it.
 

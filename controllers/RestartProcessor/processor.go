@@ -46,10 +46,16 @@ func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjec
 	}
 }
 
+// staggerSleep is the sleep used for the settle delay before the first status
+// poll in staggered mode. It is a variable so tests can replace it.
+var staggerSleep = time.Sleep
+
 // restartNamespacesStaggered processes namespaces one at a time in sorted order.
-// Within a namespace every object is restarted sequentially, then each object is
-// forced through WaitForRestartToBeComplete (regardless of the CRD's CheckStatus)
-// before the next namespace is touched. Used when FLIPPY_STAGGER_NAMESPACES=true.
+// Within a namespace each object is restarted and then forced through
+// WaitForRestartToBeComplete (regardless of the CRD's CheckStatus) before the
+// next object is touched; the next namespace starts only after every object in
+// the current one is healthy or has exhausted its retries.
+// Used when FLIPPY_STAGGER_NAMESPACES=true.
 func restartNamespacesStaggered(k8s k8s.K8sAPI, processor RestartProcessorInterface, objectType string, restart common.RestartObjects) {
 	namespaces := make([]string, 0, len(restart.NamespaceObjects))
 	for namespace := range restart.NamespaceObjects {
@@ -57,7 +63,7 @@ func restartNamespacesStaggered(k8s k8s.K8sAPI, processor RestartProcessorInterf
 	}
 	sort.Strings(namespaces)
 
-	// Restart without the per-object wait; the forced wait below gates the namespace.
+	// Restart without the per-object wait inside RestartObject; the forced wait below gates instead.
 	restartConfig := restart.RestartConfig
 	restartConfig.CheckStatus = false
 
@@ -71,9 +77,16 @@ func restartNamespacesStaggered(k8s k8s.K8sAPI, processor RestartProcessorInterf
 		log.WithFields(logFields).Infof("Staggered restart: starting namespace with %d object(s)", len(objects))
 
 		for _, objectName := range objects {
-			processor.RestartObject(k8s, restartConfig, namespace, objectName, 0)
-		}
-		for _, objectName := range objects {
+			if err := processor.RestartObject(k8s, restartConfig, namespace, objectName, 0); err != nil {
+				// The restart command itself failed (object gone, RBAC, etc.). Waiting on its
+				// status would only burn the retry budget, so move on.
+				log.WithFields(logFields).WithField(common.NAME, objectName).Warn("Staggered restart: restart command failed, skipping health wait for this object")
+				continue
+			}
+			// Give the controller a chance to observe the restart before trusting the
+			// first status read. Argo Rollouts in particular can still report Healthy
+			// for a moment after the restart annotation is patched.
+			staggerSleep(time.Duration(waitConfig.RetryDuration) * time.Second)
 			processor.WaitForRestartToBeComplete(k8s, waitConfig, namespace, objectName, 0)
 		}
 
@@ -98,7 +111,7 @@ func staggerWaitConfig(config crdv1.StatusCheckConfig) crdv1.StatusCheckConfig {
 	return wait
 }
 
-func (RestartDeploymentWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) {
+func (RestartDeploymentWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) error {
 	log.Infof("Restarting deployment %s in namespace %s", restartObjectName, namespace)
 	output, err := k8s.RolloutRestartDeployment(common.KubeconfigPath, namespace, restartObjectName)
 	if err != nil {
@@ -108,6 +121,7 @@ func (RestartDeploymentWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv
 	if restartConfig.CheckStatus {
 		RestartDeploymentProcessor.WaitForRestartToBeComplete(k8s, restartConfig, namespace, restartObjectName, retryCount)
 	}
+	return err
 }
 
 func (RestartDeploymentWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) {
@@ -139,7 +153,7 @@ func (RestartDeploymentWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, resta
 	}
 }
 
-func (RestartRolloutWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) {
+func (RestartRolloutWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) error {
 	log.Infof("Restarting rollout %s in namespace %s", restartObjectName, namespace)
 	output, err := k8s.RolloutRestartArgoRollouts(common.KubeconfigPath, namespace, restartObjectName)
 	if err != nil {
@@ -150,6 +164,7 @@ func (RestartRolloutWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.S
 	if restartConfig.CheckStatus {
 		RestartRolloutProcessor.WaitForRestartToBeComplete(k8s, restartConfig, namespace, restartObjectName, retryCount)
 	}
+	return err
 }
 
 func (RestartRolloutWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) {
