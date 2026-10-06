@@ -5,6 +5,7 @@ import (
 	"github.com/keikoproj/flippy/pkg/common"
 	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
 	log "github.com/sirupsen/logrus"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,10 @@ import (
 func (RestartDeploymentWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjects) {
 
 	if strings.ToLower(restart.Type) == common.DEPLOYMENT {
+		if common.StaggerNamespacesEnabled {
+			restartNamespacesStaggered(k8s, RestartDeploymentProcessor, common.DEPLOYMENT, restart)
+			return
+		}
 		for namespace, objects := range restart.NamespaceObjects {
 			for _, objectName := range objects {
 				RestartDeploymentProcessor.RestartObject(k8s, restart.RestartConfig, namespace, objectName, 0)
@@ -27,6 +32,10 @@ func (RestartDeploymentWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartOb
 func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjects) {
 
 	if strings.ToLower(restart.Type) == common.ARGO_ROLLOUT {
+		if common.StaggerNamespacesEnabled {
+			restartNamespacesStaggered(k8s, RestartRolloutProcessor, common.ARGO_ROLLOUT, restart)
+			return
+		}
 		for namespace, objects := range restart.NamespaceObjects {
 			for _, objectName := range objects {
 				RestartRolloutProcessor.RestartObject(k8s, restart.RestartConfig, namespace, objectName, 0)
@@ -35,6 +44,58 @@ func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjec
 	} else {
 		log.Error("Found " + restart.Type + " while processing " + common.ARGO_ROLLOUT)
 	}
+}
+
+// restartNamespacesStaggered processes namespaces one at a time in sorted order.
+// Within a namespace every object is restarted sequentially, then each object is
+// forced through WaitForRestartToBeComplete (regardless of the CRD's CheckStatus)
+// before the next namespace is touched. Used when FLIPPY_STAGGER_NAMESPACES=true.
+func restartNamespacesStaggered(k8s k8s.K8sAPI, processor RestartProcessorInterface, objectType string, restart common.RestartObjects) {
+	namespaces := make([]string, 0, len(restart.NamespaceObjects))
+	for namespace := range restart.NamespaceObjects {
+		namespaces = append(namespaces, namespace)
+	}
+	sort.Strings(namespaces)
+
+	// Restart without the per-object wait; the forced wait below gates the namespace.
+	restartConfig := restart.RestartConfig
+	restartConfig.CheckStatus = false
+
+	waitConfig := staggerWaitConfig(restart.RestartConfig)
+
+	log.WithFields(log.Fields{common.TYPE: objectType}).Infof("Namespace staggering enabled. Processing %d namespace(s) in order: %v", len(namespaces), namespaces)
+
+	for _, namespace := range namespaces {
+		objects := restart.NamespaceObjects[namespace]
+		logFields := log.Fields{common.TYPE: objectType, common.NAMESPACE: namespace}
+		log.WithFields(logFields).Infof("Staggered restart: starting namespace with %d object(s)", len(objects))
+
+		for _, objectName := range objects {
+			processor.RestartObject(k8s, restartConfig, namespace, objectName, 0)
+		}
+		for _, objectName := range objects {
+			processor.WaitForRestartToBeComplete(k8s, waitConfig, namespace, objectName, 0)
+		}
+
+		log.WithFields(logFields).Info("Staggered restart: namespace complete")
+	}
+}
+
+// staggerWaitConfig forces a status check, falling back to defaults when the
+// CRD config does not specify retry parameters.
+func staggerWaitConfig(config crdv1.StatusCheckConfig) crdv1.StatusCheckConfig {
+	wait := crdv1.StatusCheckConfig{
+		CheckStatus:   true,
+		MaxRetry:      config.MaxRetry,
+		RetryDuration: config.RetryDuration,
+	}
+	if wait.MaxRetry <= 0 {
+		wait.MaxRetry = common.DefaultStaggerMaxRetry
+	}
+	if wait.RetryDuration <= 0 {
+		wait.RetryDuration = common.DefaultStaggerRetryDurationSeconds
+	}
+	return wait
 }
 
 func (RestartDeploymentWrapper) RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) {
@@ -109,7 +170,7 @@ func (RestartRolloutWrapper) WaitForRestartToBeComplete(k8s k8s.K8sAPI, restartC
 		if retryCount < restartConfig.MaxRetry {
 			log.WithFields(logFields).Info("Retrying restart")
 			time.Sleep(time.Duration(restartConfig.RetryDuration) * time.Second)
-			RestartRolloutProcessor.WaitForRestartToBeComplete(k8s, restartConfig, namespace, restartObjectName, retryCount)
+			RestartRolloutProcessor.WaitForRestartToBeComplete(k8s, restartConfig, namespace, restartObjectName, retryCount+1)
 		} else {
 			logFields[common.RETRY_COUNT] = retryCount
 			log.WithFields(logFields).Info("Restart retry timed out")

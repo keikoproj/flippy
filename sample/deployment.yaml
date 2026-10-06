@@ -62,6 +62,11 @@ spec:
       containers:
         - image: docker.intuit.com/docker-rmt/keikoproj/flippy:master
           name: flippy
+          # Optional: restart one namespace at a time (sorted), waiting for each namespace
+          # to be healthy before moving on. Default (unset/false) restarts all namespaces back to back.
+          env:
+            - name: FLIPPY_STAGGER_NAMESPACES
+              value: "false"
           resources:
             limits:
               cpu: 1

@@ -1,6 +1,8 @@
 package RestartProcessor
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +66,10 @@ type MockK8sAPI struct {
 	DeploymentStatusCalls  []MockCall
 	RestartRolloutCalls    []MockCall
 	RolloutStatusCalls     []MockCall
+
+	// Sequence records every restart/status call in invocation order as "<op>:<ns>/<name>"
+	// so tests can assert ordering and gating across namespaces.
+	Sequence []string
 }
 
 type MockCall struct {
@@ -75,6 +81,7 @@ type MockCall struct {
 // RestartProcessor specific methods
 func (m *MockK8sAPI) RolloutRestartDeployment(kubeconfigpath, namespace, deploymentName string) (string, error) {
 	m.RestartDeploymentCalls = append(m.RestartDeploymentCalls, MockCall{kubeconfigpath, namespace, deploymentName})
+	m.Sequence = append(m.Sequence, "restart:"+namespace+"/"+deploymentName)
 	if m.RolloutRestartDeploymentFunc != nil {
 		return m.RolloutRestartDeploymentFunc(kubeconfigpath, namespace, deploymentName)
 	}
@@ -83,6 +90,7 @@ func (m *MockK8sAPI) RolloutRestartDeployment(kubeconfigpath, namespace, deploym
 
 func (m *MockK8sAPI) RolloutDeploymentStatus(kubeconfigpath, namespace, deploymentName string) (string, error) {
 	m.DeploymentStatusCalls = append(m.DeploymentStatusCalls, MockCall{kubeconfigpath, namespace, deploymentName})
+	m.Sequence = append(m.Sequence, "status:"+namespace+"/"+deploymentName)
 	if m.RolloutDeploymentStatusFunc != nil {
 		return m.RolloutDeploymentStatusFunc(kubeconfigpath, namespace, deploymentName)
 	}
@@ -91,6 +99,7 @@ func (m *MockK8sAPI) RolloutDeploymentStatus(kubeconfigpath, namespace, deployme
 
 func (m *MockK8sAPI) RolloutRestartArgoRollouts(kubeconfigpath, namespace, argoRolloutName string) (string, error) {
 	m.RestartRolloutCalls = append(m.RestartRolloutCalls, MockCall{kubeconfigpath, namespace, argoRolloutName})
+	m.Sequence = append(m.Sequence, "restart:"+namespace+"/"+argoRolloutName)
 	if m.RolloutRestartArgoRolloutsFunc != nil {
 		return m.RolloutRestartArgoRolloutsFunc(kubeconfigpath, namespace, argoRolloutName)
 	}
@@ -99,6 +108,7 @@ func (m *MockK8sAPI) RolloutRestartArgoRollouts(kubeconfigpath, namespace, argoR
 
 func (m *MockK8sAPI) RolloutArogRolloutStatus(kubeconfigpath, namespace, argoRolloutName string) (string, error) {
 	m.RolloutStatusCalls = append(m.RolloutStatusCalls, MockCall{kubeconfigpath, namespace, argoRolloutName})
+	m.Sequence = append(m.Sequence, "status:"+namespace+"/"+argoRolloutName)
 	if m.RolloutArogRolloutStatusFunc != nil {
 		return m.RolloutArogRolloutStatusFunc(kubeconfigpath, namespace, argoRolloutName)
 	}
@@ -513,5 +523,226 @@ func TestRestartRolloutWrapper_WaitForRestartToBeComplete(t *testing.T) {
 	// Verify retry logic worked correctly
 	if len(mockK8s.RolloutStatusCalls) != 3 {
 		t.Errorf("Expected 3 status calls, got %d", len(mockK8s.RolloutStatusCalls))
+	}
+}
+
+// withStagger toggles common.StaggerNamespacesEnabled for the duration of a test.
+func withStagger(t *testing.T, enabled bool) {
+	t.Helper()
+	original := common.StaggerNamespacesEnabled
+	common.StaggerNamespacesEnabled = enabled
+	t.Cleanup(func() { common.StaggerNamespacesEnabled = original })
+}
+
+// staggerTestObjects deliberately uses keys that sort differently from insertion order.
+var staggerTestObjects = map[string][]string{
+	"ns-c": {"obj-c1"},
+	"ns-a": {"obj-a1", "obj-a2"},
+	"ns-b": {"obj-b1"},
+}
+
+// assertStaggeredSequence checks that, for sorted namespaces, every restart and
+// every status call of namespace n precedes any call for namespace n+1, and that
+// each object got exactly one restart and at least one status check.
+func assertStaggeredSequence(t *testing.T, sequence []string, objects map[string][]string) {
+	t.Helper()
+	wantOrder := []string{"ns-a", "ns-b", "ns-c"}
+
+	// Namespace of each call, de-duplicated consecutively, must equal the sorted order.
+	var seenOrder []string
+	for _, call := range sequence {
+		ns := strings.SplitN(strings.SplitN(call, ":", 2)[1], "/", 2)[0]
+		if len(seenOrder) == 0 || seenOrder[len(seenOrder)-1] != ns {
+			seenOrder = append(seenOrder, ns)
+		}
+	}
+	if !reflect.DeepEqual(seenOrder, wantOrder) {
+		t.Fatalf("namespaces were not processed in sorted, gated order.\nwant %v\ngot  %v\nsequence: %v", wantOrder, seenOrder, sequence)
+	}
+
+	// Within a namespace: all restarts, then at least one status per object.
+	for ns, names := range objects {
+		restarts, statuses := 0, map[string]int{}
+		lastRestartIdx, firstStatusIdx := -1, len(sequence)
+		for i, call := range sequence {
+			if !strings.Contains(call, ":"+ns+"/") {
+				continue
+			}
+			if strings.HasPrefix(call, "restart:") {
+				restarts++
+				lastRestartIdx = i
+			} else {
+				statuses[strings.TrimPrefix(call, "status:"+ns+"/")]++
+				if i < firstStatusIdx {
+					firstStatusIdx = i
+				}
+			}
+		}
+		if restarts != len(names) {
+			t.Errorf("namespace %s: expected %d restarts, got %d", ns, len(names), restarts)
+		}
+		if lastRestartIdx > firstStatusIdx {
+			t.Errorf("namespace %s: a restart happened after a status check began (sequence %v)", ns, sequence)
+		}
+		for _, name := range names {
+			if statuses[name] == 0 {
+				t.Errorf("namespace %s: object %s was never status-checked", ns, name)
+			}
+		}
+	}
+}
+
+func TestRestartDeploymentWrapper_Restart_StaggerOn_OrdersAndGatesEvenWithCheckStatusFalse(t *testing.T) {
+	withStagger(t, true)
+	mockK8s := &MockK8sAPI{}
+
+	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
+		Type:             common.DEPLOYMENT,
+		NamespaceObjects: staggerTestObjects,
+		// CheckStatus false must NOT disable the per-namespace gate.
+		RestartConfig: crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
+	})
+
+	if len(mockK8s.RestartDeploymentCalls) != 4 {
+		t.Fatalf("expected 4 restarts, got %d", len(mockK8s.RestartDeploymentCalls))
+	}
+	assertStaggeredSequence(t, mockK8s.Sequence, staggerTestObjects)
+}
+
+func TestRestartRolloutWrapper_Restart_StaggerOn_OrdersAndGatesEvenWithCheckStatusFalse(t *testing.T) {
+	withStagger(t, true)
+	mockK8s := &MockK8sAPI{}
+
+	RestartRolloutWrapper{}.Restart(mockK8s, common.RestartObjects{
+		Type:             common.ARGO_ROLLOUT,
+		NamespaceObjects: staggerTestObjects,
+		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
+	})
+
+	if len(mockK8s.RestartRolloutCalls) != 4 {
+		t.Fatalf("expected 4 restarts, got %d", len(mockK8s.RestartRolloutCalls))
+	}
+	assertStaggeredSequence(t, mockK8s.Sequence, staggerTestObjects)
+}
+
+// With CheckStatus already true, staggering must not double-wait: each object is
+// status-checked once (healthy on first poll), not once in RestartObject and again in the gate.
+func TestRestartDeploymentWrapper_Restart_StaggerOn_NoDoubleWaitWhenCheckStatusTrue(t *testing.T) {
+	withStagger(t, true)
+	mockK8s := &MockK8sAPI{}
+
+	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
+		Type:             common.DEPLOYMENT,
+		NamespaceObjects: map[string][]string{"ns-a": {"obj-a1", "obj-a2"}},
+		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 2, RetryDuration: 1},
+	})
+
+	if len(mockK8s.DeploymentStatusCalls) != 2 {
+		t.Errorf("expected exactly 2 status calls (one per object), got %d: %v", len(mockK8s.DeploymentStatusCalls), mockK8s.Sequence)
+	}
+}
+
+// The gate must hold the next namespace until the current one is healthy or retries are exhausted.
+func TestRestartDeploymentWrapper_Restart_StaggerOn_WaitsForUnhealthyNamespaceUntilRetriesExhausted(t *testing.T) {
+	withStagger(t, true)
+	mockK8s := &MockK8sAPI{
+		RolloutDeploymentStatusFunc: func(_, ns, name string) (string, error) {
+			if ns == "ns-a" {
+				return "Waiting for deployment spec update to be observed...", nil
+			}
+			return "successfully rolled out", nil
+		},
+	}
+
+	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
+		Type:             common.DEPLOYMENT,
+		NamespaceObjects: map[string][]string{"ns-a": {"obj-a1"}, "ns-b": {"obj-b1"}},
+		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
+	})
+
+	// ns-a: 1 restart + 3 status polls (initial + 2 retries); ns-b: 1 restart + 1 status.
+	want := []string{
+		"restart:ns-a/obj-a1", "status:ns-a/obj-a1", "status:ns-a/obj-a1", "status:ns-a/obj-a1",
+		"restart:ns-b/obj-b1", "status:ns-b/obj-b1",
+	}
+	if !reflect.DeepEqual(mockK8s.Sequence, want) {
+		t.Errorf("unexpected sequence\nwant %v\ngot  %v", want, mockK8s.Sequence)
+	}
+}
+
+func TestRestart_StaggerOff_BehaviorUnchanged(t *testing.T) {
+	withStagger(t, false)
+
+	t.Run("deployment: no status calls when CheckStatus false", func(t *testing.T) {
+		mockK8s := &MockK8sAPI{}
+		RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
+			Type:             common.DEPLOYMENT,
+			NamespaceObjects: staggerTestObjects,
+			RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false},
+		})
+		if len(mockK8s.RestartDeploymentCalls) != 4 {
+			t.Errorf("expected 4 restarts, got %d", len(mockK8s.RestartDeploymentCalls))
+		}
+		if len(mockK8s.DeploymentStatusCalls) != 0 {
+			t.Errorf("expected no status calls with staggering off, got %d", len(mockK8s.DeploymentStatusCalls))
+		}
+	})
+
+	t.Run("rollout: no status calls when CheckStatus false", func(t *testing.T) {
+		mockK8s := &MockK8sAPI{}
+		RestartRolloutWrapper{}.Restart(mockK8s, common.RestartObjects{
+			Type:             common.ARGO_ROLLOUT,
+			NamespaceObjects: staggerTestObjects,
+			RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false},
+		})
+		if len(mockK8s.RestartRolloutCalls) != 4 {
+			t.Errorf("expected 4 restarts, got %d", len(mockK8s.RestartRolloutCalls))
+		}
+		if len(mockK8s.RolloutStatusCalls) != 0 {
+			t.Errorf("expected no status calls with staggering off, got %d", len(mockK8s.RolloutStatusCalls))
+		}
+	})
+}
+
+func TestStaggerWaitConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		in   crdv1.StatusCheckConfig
+		want crdv1.StatusCheckConfig
+	}{
+		{
+			name: "defaults when unset",
+			in:   crdv1.StatusCheckConfig{},
+			want: crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: common.DefaultStaggerMaxRetry, RetryDuration: common.DefaultStaggerRetryDurationSeconds},
+		},
+		{
+			name: "uses CRD values and forces CheckStatus",
+			in:   crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 4, RetryDuration: 7},
+			want: crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 4, RetryDuration: 7},
+		},
+		{
+			name: "partial: only MaxRetry set",
+			in:   crdv1.StatusCheckConfig{MaxRetry: 3},
+			want: crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 3, RetryDuration: common.DefaultStaggerRetryDurationSeconds},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := staggerWaitConfig(tt.in); got != tt.want {
+				t.Errorf("staggerWaitConfig(%+v) = %+v, want %+v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// Regression: rollout wait previously recursed without incrementing retryCount and never timed out.
+func TestRestartRolloutWrapper_WaitForRestartToBeComplete_TimesOutAfterMaxRetry(t *testing.T) {
+	mockK8s := &MockK8sAPI{
+		RolloutArogRolloutStatusFunc: func(_, _, _ string) (string, error) { return "Progressing", nil },
+	}
+	RestartRolloutWrapper{}.WaitForRestartToBeComplete(mockK8s, crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 2, RetryDuration: 1}, "test-ns", "test-rollout", 0)
+
+	if len(mockK8s.RolloutStatusCalls) != 3 { // initial + 2 retries
+		t.Errorf("expected 3 status calls, got %d", len(mockK8s.RolloutStatusCalls))
 	}
 }
