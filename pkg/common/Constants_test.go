@@ -25,3 +25,25 @@ func TestParseStaggerNamespacesEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestParseStaggerMaxParallelGroups(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  int
+	}{
+		{"missing", "", DefaultStaggerMaxParallelGroups},
+		{"valid", "3", 3},
+		{"one", "1", 1},
+		{"zero falls back", "0", DefaultStaggerMaxParallelGroups},
+		{"negative falls back", "-2", DefaultStaggerMaxParallelGroups},
+		{"garbage falls back", "many", DefaultStaggerMaxParallelGroups},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseStaggerMaxParallelGroups(tt.value); got != tt.want {
+				t.Errorf("ParseStaggerMaxParallelGroups(%q) = %d, want %d", tt.value, got, tt.want)
+			}
+		})
+	}
+}

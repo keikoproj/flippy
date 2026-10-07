@@ -62,11 +62,15 @@ spec:
       containers:
         - image: docker.intuit.com/docker-rmt/keikoproj/flippy:master
           name: flippy
-          # Optional: restart one namespace at a time (sorted), waiting for each namespace
-          # to be healthy before moving on. Default (unset/false) restarts all namespaces back to back.
+          # Optional: group namespaces by the iks.intuit.com/service-asset-alias annotation and
+          # rotate each group one namespace at a time (Deployments then Rollouts, one object at a
+          # time with a health wait). Groups run in parallel up to FLIPPY_STAGGER_MAX_PARALLEL_GROUPS.
+          # Default (unset/false) restarts all namespaces back to back. See Docs/install.md.
           env:
             - name: FLIPPY_STAGGER_NAMESPACES
               value: "false"
+            - name: FLIPPY_STAGGER_MAX_PARALLEL_GROUPS
+              value: "5"
           resources:
             limits:
               cpu: 1

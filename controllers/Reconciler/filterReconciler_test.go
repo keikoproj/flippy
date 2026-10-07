@@ -126,12 +126,14 @@ func TestReconcilerWrapper_FilterNameSpaceNeedAttention(t *testing.T) {
 		Type:             common.DEPLOYMENT,
 		NamespaceObjects: happyNamespace,
 		RestartConfig:    BuildTestFlippyStatusCheckConfig(),
+		Healthy:          true,
 	})
 
 	expectedRestartObjectsNonMatchingPodImage = append(expectedRestartObjectsNonMatchingPodImage, common.RestartObjects{
 		Type:             common.ARGO_ROLLOUT,
 		NamespaceObjects: happyNamespace,
 		RestartConfig:    BuildTestFlippyStatusCheckConfig(),
+		Healthy:          true,
 	})
 
 	expectedRestartObjectsNonMatchingPodImage = append(expectedRestartObjectsNonMatchingPodImage, common.RestartObjects{

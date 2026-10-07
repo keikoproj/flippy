@@ -5,7 +5,6 @@ import (
 	"github.com/keikoproj/flippy/pkg/common"
 	"github.com/keikoproj/flippy/pkg/k8s-utils/k8s"
 	log "github.com/sirupsen/logrus"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,10 +13,6 @@ import (
 func (RestartDeploymentWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjects) {
 
 	if strings.ToLower(restart.Type) == common.DEPLOYMENT {
-		if common.StaggerNamespacesEnabled {
-			restartNamespacesStaggered(k8s, RestartDeploymentProcessor, common.DEPLOYMENT, restart)
-			return
-		}
 		for namespace, objects := range restart.NamespaceObjects {
 			for _, objectName := range objects {
 				RestartDeploymentProcessor.RestartObject(k8s, restart.RestartConfig, namespace, objectName, 0)
@@ -32,10 +27,6 @@ func (RestartDeploymentWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartOb
 func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjects) {
 
 	if strings.ToLower(restart.Type) == common.ARGO_ROLLOUT {
-		if common.StaggerNamespacesEnabled {
-			restartNamespacesStaggered(k8s, RestartRolloutProcessor, common.ARGO_ROLLOUT, restart)
-			return
-		}
 		for namespace, objects := range restart.NamespaceObjects {
 			for _, objectName := range objects {
 				RestartRolloutProcessor.RestartObject(k8s, restart.RestartConfig, namespace, objectName, 0)
@@ -46,52 +37,28 @@ func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjec
 	}
 }
 
-// staggerSleep is the sleep used for the settle delay before the first status
+// StaggerSleep is the sleep used for the settle delay before the first status
 // poll in staggered mode. It is a variable so tests can replace it.
-var staggerSleep = time.Sleep
+var StaggerSleep = time.Sleep
 
-// restartNamespacesStaggered processes namespaces one at a time in sorted order.
-// Within a namespace each object is restarted and then forced through
-// WaitForRestartToBeComplete (regardless of the CRD's CheckStatus) before the
-// next object is touched; the next namespace starts only after every object in
-// the current one is healthy or has exhausted its retries.
-// Used when FLIPPY_STAGGER_NAMESPACES=true.
-func restartNamespacesStaggered(k8s k8s.K8sAPI, processor RestartProcessorInterface, objectType string, restart common.RestartObjects) {
-	namespaces := make([]string, 0, len(restart.NamespaceObjects))
-	for namespace := range restart.NamespaceObjects {
-		namespaces = append(namespaces, namespace)
+// RestartObjectGated restarts a single object and then waits for it to report
+// healthy (or exhaust retries) before returning. The wait is forced regardless
+// of config.CheckStatus; MaxRetry/RetryDuration fall back to defaults when unset.
+// A settle delay of one RetryDuration precedes the first status poll because
+// Argo Rollouts can still report Healthy right after the restart annotation is
+// patched. If the restart command itself fails the wait is skipped.
+// This is the per-object primitive behind FLIPPY_STAGGER_NAMESPACES.
+func RestartObjectGated(k8s k8s.K8sAPI, processor RestartProcessorInterface, config crdv1.StatusCheckConfig, namespace string, objectName string) {
+	restartConfig := config
+	restartConfig.CheckStatus = false // the forced wait below gates instead
+	waitConfig := staggerWaitConfig(config)
+
+	if err := processor.RestartObject(k8s, restartConfig, namespace, objectName, 0); err != nil {
+		log.WithFields(log.Fields{common.NAMESPACE: namespace, common.NAME: objectName}).Warn("Staggered restart: restart command failed, skipping health wait for this object")
+		return
 	}
-	sort.Strings(namespaces)
-
-	// Restart without the per-object wait inside RestartObject; the forced wait below gates instead.
-	restartConfig := restart.RestartConfig
-	restartConfig.CheckStatus = false
-
-	waitConfig := staggerWaitConfig(restart.RestartConfig)
-
-	log.WithFields(log.Fields{common.TYPE: objectType}).Infof("Namespace staggering enabled. Processing %d namespace(s) in order: %v", len(namespaces), namespaces)
-
-	for _, namespace := range namespaces {
-		objects := restart.NamespaceObjects[namespace]
-		logFields := log.Fields{common.TYPE: objectType, common.NAMESPACE: namespace}
-		log.WithFields(logFields).Infof("Staggered restart: starting namespace with %d object(s)", len(objects))
-
-		for _, objectName := range objects {
-			if err := processor.RestartObject(k8s, restartConfig, namespace, objectName, 0); err != nil {
-				// The restart command itself failed (object gone, RBAC, etc.). Waiting on its
-				// status would only burn the retry budget, so move on.
-				log.WithFields(logFields).WithField(common.NAME, objectName).Warn("Staggered restart: restart command failed, skipping health wait for this object")
-				continue
-			}
-			// Give the controller a chance to observe the restart before trusting the
-			// first status read. Argo Rollouts in particular can still report Healthy
-			// for a moment after the restart annotation is patched.
-			staggerSleep(time.Duration(waitConfig.RetryDuration) * time.Second)
-			processor.WaitForRestartToBeComplete(k8s, waitConfig, namespace, objectName, 0)
-		}
-
-		log.WithFields(logFields).Info("Staggered restart: namespace complete")
-	}
+	StaggerSleep(time.Duration(waitConfig.RetryDuration) * time.Second)
+	processor.WaitForRestartToBeComplete(k8s, waitConfig, namespace, objectName, 0)
 }
 
 // staggerWaitConfig forces a status check, falling back to defaults when the

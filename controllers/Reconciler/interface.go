@@ -21,6 +21,11 @@ type ReconcilerInterface interface {
 	IsAnyPodRunningWithProvidedDockerImage(podList []corev1.Pod, dockerImages []string, containers []string) bool
 
 	ProcessNamespaceRestarts(k8s k8s.K8sAPI, restartObjects []common.RestartObjects)
+
+	// ProcessRestartsStaggered groups namespaces by asset alias and rotates each
+	// group sequentially (Deployments then Rollouts, one object at a time with a
+	// health wait), running groups in parallel up to common.StaggerMaxParallelGroups.
+	ProcessRestartsStaggered(k8s k8s.K8sAPI, clientset k8s.ClientSet, restarts []common.RestartObjects)
 }
 
 type ReconcilerWrapper struct{}

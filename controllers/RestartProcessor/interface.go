@@ -14,6 +14,10 @@ type RestartProcessorInterface interface {
 	Restart(k8s k8s.K8sAPI, restarts common.RestartObjects)
 }
 
+// Gated is the restart-then-wait primitive used by staggered mode. It is a
+// variable so the reconciler tests can stub it.
+var Gated = RestartObjectGated
+
 type RestartDeploymentWrapper struct{}
 
 type RestartRolloutWrapper struct{}

@@ -27,10 +27,32 @@ const StaggerNamespacesEnvVar = "FLIPPY_STAGGER_NAMESPACES"
 const DefaultStaggerMaxRetry = 10
 const DefaultStaggerRetryDurationSeconds = 30
 
-// StaggerNamespacesEnabled, when true, makes the restart processors handle one
-// namespace at a time in sorted order, waiting for every object in a namespace
-// to be healthy before moving on. Read once at startup from FLIPPY_STAGGER_NAMESPACES.
+// StaggerMaxParallelGroupsEnvVar caps how many asset-alias groups rotate concurrently in staggered mode.
+const StaggerMaxParallelGroupsEnvVar = "FLIPPY_STAGGER_MAX_PARALLEL_GROUPS"
+const DefaultStaggerMaxParallelGroups = 5
+
+// AssetAliasAnnotation is the Namespace annotation that identifies the owning asset.
+// Namespaces sharing a value are rotated sequentially as one group in staggered mode.
+const AssetAliasAnnotation = "iks.intuit.com/service-asset-alias"
+
+// StaggerNamespacesEnabled, when true, groups namespaces by asset alias and
+// rotates each group one namespace at a time (Deployments then Rollouts, one
+// object at a time with a health wait). Groups run in parallel up to
+// StaggerMaxParallelGroups. Read once at startup from FLIPPY_STAGGER_NAMESPACES.
 var StaggerNamespacesEnabled = ParseStaggerNamespacesEnabled(os.Getenv(StaggerNamespacesEnvVar))
+
+// StaggerMaxParallelGroups is the concurrency cap for alias groups in staggered mode.
+var StaggerMaxParallelGroups = ParseStaggerMaxParallelGroups(os.Getenv(StaggerMaxParallelGroupsEnvVar))
+
+// ParseStaggerMaxParallelGroups parses the env var value. Missing, invalid or
+// non-positive values yield DefaultStaggerMaxParallelGroups.
+func ParseStaggerMaxParallelGroups(value string) int {
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return DefaultStaggerMaxParallelGroups
+	}
+	return n
+}
 
 // ParseStaggerNamespacesEnabled parses the env var value. Missing or invalid values yield false.
 func ParseStaggerNamespacesEnabled(value string) bool {
@@ -46,6 +68,10 @@ type RestartObjects struct {
 	//Map of Namespace and list of objects to restart
 	NamespaceObjects map[string][]string
 	RestartConfig    crdv1.StatusCheckConfig
+	// Healthy is true when the objects were reporting healthy before Flippy
+	// touched them. Only healthy objects get the forced health wait in
+	// staggered mode; already-unhealthy ones are restarted without waiting.
+	Healthy bool
 }
 
 var IgnoreMetadataKey string

@@ -3,7 +3,6 @@ package RestartProcessor
 import (
 	"errors"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -527,187 +526,127 @@ func TestRestartRolloutWrapper_WaitForRestartToBeComplete(t *testing.T) {
 	}
 }
 
-// withStagger toggles common.StaggerNamespacesEnabled for the duration of a test.
-func withStagger(t *testing.T, enabled bool) {
+// withNoSettle stubs the settle delay for the duration of a test.
+func withNoSettle(t *testing.T) {
 	t.Helper()
-	original := common.StaggerNamespacesEnabled
-	originalSleep := staggerSleep
-	common.StaggerNamespacesEnabled = enabled
-	staggerSleep = func(time.Duration) {} // settle delay is covered by its own test
-	t.Cleanup(func() {
-		common.StaggerNamespacesEnabled = original
-		staggerSleep = originalSleep
-	})
+	original := StaggerSleep
+	StaggerSleep = func(time.Duration) {}
+	t.Cleanup(func() { StaggerSleep = original })
 }
 
-// staggerTestObjects deliberately uses keys that sort differently from insertion order.
-var staggerTestObjects = map[string][]string{
-	"ns-c": {"obj-c1"},
-	"ns-a": {"obj-a1", "obj-a2"},
-	"ns-b": {"obj-b1"},
-}
-
-// assertStaggeredSequence checks that, for sorted namespaces, every restart and
-// every status call of namespace n precedes any call for namespace n+1, that
-// within a namespace each object is restarted and status-checked before the
-// next object is restarted, and that each object got exactly one restart.
-func assertStaggeredSequence(t *testing.T, sequence []string, objects map[string][]string) {
-	t.Helper()
-	wantOrder := []string{"ns-a", "ns-b", "ns-c"}
-
-	// Namespace of each call, de-duplicated consecutively, must equal the sorted order.
-	var seenOrder []string
-	for _, call := range sequence {
-		ns := strings.SplitN(strings.SplitN(call, ":", 2)[1], "/", 2)[0]
-		if len(seenOrder) == 0 || seenOrder[len(seenOrder)-1] != ns {
-			seenOrder = append(seenOrder, ns)
-		}
-	}
-	if !reflect.DeepEqual(seenOrder, wantOrder) {
-		t.Fatalf("namespaces were not processed in sorted, gated order.\nwant %v\ngot  %v\nsequence: %v", wantOrder, seenOrder, sequence)
-	}
-
-	// Within a namespace: restart obj, status obj (1+), restart next obj, ... strictly in order.
-	for ns, names := range objects {
-		var nsCalls []string
-		for _, call := range sequence {
-			if strings.Contains(call, ":"+ns+"/") {
-				nsCalls = append(nsCalls, call)
+func TestRestartObjectGated_RestartsThenWaits_EvenWithCheckStatusFalse(t *testing.T) {
+	withNoSettle(t)
+	for _, tc := range []struct {
+		name      string
+		processor RestartProcessorInterface
+	}{
+		{"deployment", RestartDeploymentWrapper{}},
+		{"rollout", RestartRolloutWrapper{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockK8s := &MockK8sAPI{}
+			RestartObjectGated(mockK8s, tc.processor, crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1}, "ns", "obj")
+			want := []string{"restart:ns/obj", "status:ns/obj"}
+			if !reflect.DeepEqual(mockK8s.Sequence, want) {
+				t.Errorf("want %v, got %v", want, mockK8s.Sequence)
 			}
-		}
-		restarts := 0
-		var current string
-		for i, call := range nsCalls {
-			name := strings.SplitN(call, "/", 2)[1]
-			if strings.HasPrefix(call, "restart:") {
-				restarts++
-				if i > 0 && !strings.HasPrefix(nsCalls[i-1], "status:") {
-					t.Errorf("namespace %s: %s restarted before previous object was status-checked (calls %v)", ns, name, nsCalls)
-				}
-				current = name
-			} else if name != current {
-				t.Errorf("namespace %s: status check for %s while %s is current (calls %v)", ns, name, current, nsCalls)
-			}
-		}
-		if restarts != len(names) {
-			t.Errorf("namespace %s: expected %d restarts, got %d", ns, len(names), restarts)
-		}
-		if len(nsCalls) > 0 && !strings.HasPrefix(nsCalls[len(nsCalls)-1], "status:") {
-			t.Errorf("namespace %s: last call was not a status check (calls %v)", ns, nsCalls)
-		}
+		})
 	}
 }
 
-func TestRestartDeploymentWrapper_Restart_StaggerOn_OrdersAndGatesEvenWithCheckStatusFalse(t *testing.T) {
-	withStagger(t, true)
+// With CheckStatus already true the object is still polled exactly once on a healthy
+// first read, not once inside RestartObject and again in the gate.
+func TestRestartObjectGated_NoDoubleWaitWhenCheckStatusTrue(t *testing.T) {
+	withNoSettle(t)
 	mockK8s := &MockK8sAPI{}
-
-	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.DEPLOYMENT,
-		NamespaceObjects: staggerTestObjects,
-		// CheckStatus false must NOT disable the per-namespace gate.
-		RestartConfig: crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
-	})
-
-	if len(mockK8s.RestartDeploymentCalls) != 4 {
-		t.Fatalf("expected 4 restarts, got %d", len(mockK8s.RestartDeploymentCalls))
-	}
-	assertStaggeredSequence(t, mockK8s.Sequence, staggerTestObjects)
-}
-
-func TestRestartRolloutWrapper_Restart_StaggerOn_OrdersAndGatesEvenWithCheckStatusFalse(t *testing.T) {
-	withStagger(t, true)
-	mockK8s := &MockK8sAPI{}
-
-	RestartRolloutWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.ARGO_ROLLOUT,
-		NamespaceObjects: staggerTestObjects,
-		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
-	})
-
-	if len(mockK8s.RestartRolloutCalls) != 4 {
-		t.Fatalf("expected 4 restarts, got %d", len(mockK8s.RestartRolloutCalls))
-	}
-	assertStaggeredSequence(t, mockK8s.Sequence, staggerTestObjects)
-}
-
-// With CheckStatus already true, staggering must not double-wait: each object is
-// status-checked once (healthy on first poll), not once in RestartObject and again in the gate.
-func TestRestartDeploymentWrapper_Restart_StaggerOn_NoDoubleWaitWhenCheckStatusTrue(t *testing.T) {
-	withStagger(t, true)
-	mockK8s := &MockK8sAPI{}
-
-	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.DEPLOYMENT,
-		NamespaceObjects: map[string][]string{"ns-a": {"obj-a1", "obj-a2"}},
-		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 2, RetryDuration: 1},
-	})
-
-	if len(mockK8s.DeploymentStatusCalls) != 2 {
-		t.Errorf("expected exactly 2 status calls (one per object), got %d: %v", len(mockK8s.DeploymentStatusCalls), mockK8s.Sequence)
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, crdv1.StatusCheckConfig{CheckStatus: true, MaxRetry: 2, RetryDuration: 1}, "ns", "obj")
+	if len(mockK8s.DeploymentStatusCalls) != 1 {
+		t.Errorf("expected exactly 1 status call, got %d: %v", len(mockK8s.DeploymentStatusCalls), mockK8s.Sequence)
 	}
 }
 
-// The gate must hold the next namespace until the current one is healthy or retries are exhausted.
-func TestRestartDeploymentWrapper_Restart_StaggerOn_WaitsForUnhealthyNamespaceUntilRetriesExhausted(t *testing.T) {
-	withStagger(t, true)
+// The gate holds until healthy or retries are exhausted.
+func TestRestartObjectGated_WaitsUntilRetriesExhausted(t *testing.T) {
+	withNoSettle(t)
 	mockK8s := &MockK8sAPI{
-		RolloutDeploymentStatusFunc: func(_, ns, name string) (string, error) {
-			if ns == "ns-a" {
-				return "Waiting for deployment spec update to be observed...", nil
+		RolloutDeploymentStatusFunc: func(_, _, _ string) (string, error) {
+			return "Waiting for deployment spec update to be observed...", nil
+		},
+	}
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 2, RetryDuration: 1}, "ns", "obj")
+	want := []string{"restart:ns/obj", "status:ns/obj", "status:ns/obj", "status:ns/obj"} // initial + 2 retries
+	if !reflect.DeepEqual(mockK8s.Sequence, want) {
+		t.Errorf("want %v, got %v", want, mockK8s.Sequence)
+	}
+}
+
+// A failed restart command must not consume the retry budget.
+func TestRestartObjectGated_SkipsWaitWhenRestartFails(t *testing.T) {
+	withNoSettle(t)
+	for _, tc := range []struct {
+		name      string
+		processor RestartProcessorInterface
+		mock      *MockK8sAPI
+	}{
+		{"deployment", RestartDeploymentWrapper{}, &MockK8sAPI{RolloutRestartDeploymentFunc: func(_, _, _ string) (string, error) { return "", errors.New("not found") }}},
+		{"rollout", RestartRolloutWrapper{}, &MockK8sAPI{RolloutRestartArgoRolloutsFunc: func(_, _, _ string) (string, error) { return "", errors.New("not found") }}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			RestartObjectGated(tc.mock, tc.processor, crdv1.StatusCheckConfig{MaxRetry: 3, RetryDuration: 1}, "ns", "gone")
+			want := []string{"restart:ns/gone"}
+			if !reflect.DeepEqual(tc.mock.Sequence, want) {
+				t.Errorf("want %v, got %v", want, tc.mock.Sequence)
 			}
+		})
+	}
+}
+
+// A settle delay of one RetryDuration precedes the first status poll of a successful restart.
+func TestRestartObjectGated_SettleDelayBeforeFirstPoll(t *testing.T) {
+	original := StaggerSleep
+	t.Cleanup(func() { StaggerSleep = original })
+
+	var events []string
+	StaggerSleep = func(d time.Duration) { events = append(events, "sleep:"+d.String()) }
+	mockK8s := &MockK8sAPI{
+		RolloutRestartDeploymentFunc: func(_, _, name string) (string, error) {
+			events = append(events, "restart:"+name)
+			if name == "gone" {
+				return "", errors.New("not found")
+			}
+			return "ok", nil
+		},
+		RolloutDeploymentStatusFunc: func(_, _, name string) (string, error) {
+			events = append(events, "status:"+name)
 			return "successfully rolled out", nil
 		},
 	}
 
-	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.DEPLOYMENT,
-		NamespaceObjects: map[string][]string{"ns-a": {"obj-a1"}, "ns-b": {"obj-b1"}},
-		RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false, MaxRetry: 2, RetryDuration: 1},
-	})
+	cfg := crdv1.StatusCheckConfig{MaxRetry: 1, RetryDuration: 7}
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, cfg, "ns", "a")
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, cfg, "ns", "gone")
 
-	// ns-a: 1 restart + 3 status polls (initial + 2 retries); ns-b: 1 restart + 1 status.
-	want := []string{
-		"restart:ns-a/obj-a1", "status:ns-a/obj-a1", "status:ns-a/obj-a1", "status:ns-a/obj-a1",
-		"restart:ns-b/obj-b1", "status:ns-b/obj-b1",
-	}
-	if !reflect.DeepEqual(mockK8s.Sequence, want) {
-		t.Errorf("unexpected sequence\nwant %v\ngot  %v", want, mockK8s.Sequence)
+	want := []string{"restart:a", "sleep:7s", "status:a", "restart:gone"}
+	if !reflect.DeepEqual(events, want) {
+		t.Errorf("want %v, got %v", want, events)
 	}
 }
 
-func TestRestart_StaggerOff_BehaviorUnchanged(t *testing.T) {
-	withStagger(t, false)
+// Restart (non-staggered entry point) is unchanged: no status calls when CheckStatus is false.
+func TestRestart_NoStatusCallsWhenCheckStatusFalse(t *testing.T) {
+	objects := map[string][]string{"ns-c": {"c1"}, "ns-a": {"a1", "a2"}, "ns-b": {"b1"}}
 
-	t.Run("deployment: no status calls when CheckStatus false", func(t *testing.T) {
-		mockK8s := &MockK8sAPI{}
-		RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-			Type:             common.DEPLOYMENT,
-			NamespaceObjects: staggerTestObjects,
-			RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false},
-		})
-		if len(mockK8s.RestartDeploymentCalls) != 4 {
-			t.Errorf("expected 4 restarts, got %d", len(mockK8s.RestartDeploymentCalls))
-		}
-		if len(mockK8s.DeploymentStatusCalls) != 0 {
-			t.Errorf("expected no status calls with staggering off, got %d", len(mockK8s.DeploymentStatusCalls))
-		}
-	})
+	depMock := &MockK8sAPI{}
+	RestartDeploymentWrapper{}.Restart(depMock, common.RestartObjects{Type: common.DEPLOYMENT, NamespaceObjects: objects})
+	if len(depMock.RestartDeploymentCalls) != 4 || len(depMock.DeploymentStatusCalls) != 0 {
+		t.Errorf("deployment: expected 4 restarts and 0 status calls, got %d/%d", len(depMock.RestartDeploymentCalls), len(depMock.DeploymentStatusCalls))
+	}
 
-	t.Run("rollout: no status calls when CheckStatus false", func(t *testing.T) {
-		mockK8s := &MockK8sAPI{}
-		RestartRolloutWrapper{}.Restart(mockK8s, common.RestartObjects{
-			Type:             common.ARGO_ROLLOUT,
-			NamespaceObjects: staggerTestObjects,
-			RestartConfig:    crdv1.StatusCheckConfig{CheckStatus: false},
-		})
-		if len(mockK8s.RestartRolloutCalls) != 4 {
-			t.Errorf("expected 4 restarts, got %d", len(mockK8s.RestartRolloutCalls))
-		}
-		if len(mockK8s.RolloutStatusCalls) != 0 {
-			t.Errorf("expected no status calls with staggering off, got %d", len(mockK8s.RolloutStatusCalls))
-		}
-	})
+	rolMock := &MockK8sAPI{}
+	RestartRolloutWrapper{}.Restart(rolMock, common.RestartObjects{Type: common.ARGO_ROLLOUT, NamespaceObjects: objects})
+	if len(rolMock.RestartRolloutCalls) != 4 || len(rolMock.RolloutStatusCalls) != 0 {
+		t.Errorf("rollout: expected 4 restarts and 0 status calls, got %d/%d", len(rolMock.RestartRolloutCalls), len(rolMock.RolloutStatusCalls))
+	}
 }
 
 func TestStaggerWaitConfig(t *testing.T) {
@@ -750,100 +689,6 @@ func TestRestartRolloutWrapper_WaitForRestartToBeComplete_TimesOutAfterMaxRetry(
 
 	if len(mockK8s.RolloutStatusCalls) != 3 { // initial + 2 retries
 		t.Errorf("expected 3 status calls, got %d", len(mockK8s.RolloutStatusCalls))
-	}
-}
-
-// A failed restart command must not consume the retry budget before the next object/namespace.
-func TestRestartDeploymentWrapper_Restart_StaggerOn_SkipsWaitWhenRestartFails(t *testing.T) {
-	withStagger(t, true)
-	mockK8s := &MockK8sAPI{
-		RolloutRestartDeploymentFunc: func(_, ns, name string) (string, error) {
-			if name == "gone" {
-				return "", errors.New(`deployments.apps "gone" not found`)
-			}
-			return "deployment.apps/" + name + " restarted", nil
-		},
-	}
-
-	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.DEPLOYMENT,
-		NamespaceObjects: map[string][]string{"ns-a": {"gone", "ok"}, "ns-b": {"ok2"}},
-		RestartConfig:    crdv1.StatusCheckConfig{MaxRetry: 3, RetryDuration: 1},
-	})
-
-	want := []string{
-		"restart:ns-a/gone", // no status calls for the failed one
-		"restart:ns-a/ok", "status:ns-a/ok",
-		"restart:ns-b/ok2", "status:ns-b/ok2",
-	}
-	if !reflect.DeepEqual(mockK8s.Sequence, want) {
-		t.Errorf("unexpected sequence\nwant %v\ngot  %v", want, mockK8s.Sequence)
-	}
-}
-
-func TestRestartRolloutWrapper_Restart_StaggerOn_SkipsWaitWhenRestartFails(t *testing.T) {
-	withStagger(t, true)
-	mockK8s := &MockK8sAPI{
-		RolloutRestartArgoRolloutsFunc: func(_, _, name string) (string, error) {
-			if name == "gone" {
-				return "", errors.New("not found")
-			}
-			return "restarted", nil
-		},
-	}
-
-	RestartRolloutWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.ARGO_ROLLOUT,
-		NamespaceObjects: map[string][]string{"ns-a": {"gone", "ok"}},
-		RestartConfig:    crdv1.StatusCheckConfig{MaxRetry: 3, RetryDuration: 1},
-	})
-
-	want := []string{"restart:ns-a/gone", "restart:ns-a/ok", "status:ns-a/ok"}
-	if !reflect.DeepEqual(mockK8s.Sequence, want) {
-		t.Errorf("unexpected sequence\nwant %v\ngot  %v", want, mockK8s.Sequence)
-	}
-}
-
-// In staggered mode a settle delay of one RetryDuration precedes the first status poll of
-// each successfully restarted object, so a stale "Healthy" read cannot release the gate.
-func TestRestart_StaggerOn_SettleDelayBeforeFirstPoll(t *testing.T) {
-	original := common.StaggerNamespacesEnabled
-	originalSleep := staggerSleep
-	common.StaggerNamespacesEnabled = true
-	t.Cleanup(func() {
-		common.StaggerNamespacesEnabled = original
-		staggerSleep = originalSleep
-	})
-
-	var events []string
-	staggerSleep = func(d time.Duration) { events = append(events, "sleep:"+d.String()) }
-	mockK8s := &MockK8sAPI{
-		RolloutRestartDeploymentFunc: func(_, _, name string) (string, error) {
-			events = append(events, "restart:"+name)
-			if name == "gone" {
-				return "", errors.New("not found")
-			}
-			return "ok", nil
-		},
-		RolloutDeploymentStatusFunc: func(_, _, name string) (string, error) {
-			events = append(events, "status:"+name)
-			return "successfully rolled out", nil
-		},
-	}
-
-	RestartDeploymentWrapper{}.Restart(mockK8s, common.RestartObjects{
-		Type:             common.DEPLOYMENT,
-		NamespaceObjects: map[string][]string{"ns": {"a", "gone", "b"}},
-		RestartConfig:    crdv1.StatusCheckConfig{MaxRetry: 1, RetryDuration: 7},
-	})
-
-	want := []string{
-		"restart:a", "sleep:7s", "status:a",
-		"restart:gone", // no sleep, no status
-		"restart:b", "sleep:7s", "status:b",
-	}
-	if !reflect.DeepEqual(events, want) {
-		t.Errorf("unexpected events\nwant %v\ngot  %v", want, events)
 	}
 }
 
