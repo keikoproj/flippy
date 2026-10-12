@@ -1,8 +1,6 @@
 module github.com/keikoproj/flippy
 
-go 1.24.0
-
-toolchain go1.24.2
+go 1.26.0
 
 require (
 	github.com/argoproj/argo-rollouts v1.8.2

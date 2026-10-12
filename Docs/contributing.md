@@ -23,7 +23,7 @@ Flippy also support argo rollouts. [Please install argo rollouts add on.](https:
 
 #### Golang
 
-Flippy is developed on [Golang Version 1.15](https://go.dev/doc/go1.15).
+Flippy is developed on [Golang Version 1.26](https://go.dev/doc/go1.26).
 
 Please install [Golang specific version.](https://go.dev/doc/install)
 
