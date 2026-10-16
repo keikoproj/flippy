@@ -54,14 +54,18 @@ func (ReconcilerWrapper) ProcessRestart(k8s k8s.K8sAPI, clientset k8s.ClientSet,
 			}
 		}
 
-		for _, restart := range restarts {
-			switch strings.ToLower(restart.Type) {
-			case common.DEPLOYMENT:
-				RestartProcessor.RestartDeploymentProcessor.Restart(k8s, restart)
-			case common.ARGO_ROLLOUT:
-				RestartProcessor.RestartRolloutProcessor.Restart(k8s, restart)
-			default:
-				log.Error("Failed to process " + restart.Type)
+		if common.StaggerNamespacesEnabled {
+			Process.ProcessRestartsStaggered(k8s, clientset, restarts)
+		} else {
+			for _, restart := range restarts {
+				switch strings.ToLower(restart.Type) {
+				case common.DEPLOYMENT:
+					RestartProcessor.RestartDeploymentProcessor.Restart(k8s, restart)
+				case common.ARGO_ROLLOUT:
+					RestartProcessor.RestartRolloutProcessor.Restart(k8s, restart)
+				default:
+					log.Error("Failed to process " + restart.Type)
+				}
 			}
 		}
 

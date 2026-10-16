@@ -7,10 +7,20 @@ import (
 )
 
 type RestartProcessorInterface interface {
-	RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int)
+	// RestartObject issues the rollout restart and, when restartConfig.CheckStatus is set,
+	// waits for it to complete. It returns the error from the restart command itself.
+	RestartObject(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int) error
 	WaitForRestartToBeComplete(k8s k8s.K8sAPI, restartConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string, retryCount int)
+	// WaitForHealthy polls status until IsHealthyStrict passes or waitConfig.MaxRetry retries
+	// are exhausted. Only staggered mode (FLIPPY_STAGGER_NAMESPACES) uses it; the default
+	// mode keeps WaitForRestartToBeComplete / IsRestartGood.
+	WaitForHealthy(k8s k8s.K8sAPI, waitConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string)
 	Restart(k8s k8s.K8sAPI, restarts common.RestartObjects)
 }
+
+// Gated is the restart-then-wait primitive used by staggered mode. It is a
+// variable so the reconciler tests can stub it.
+var Gated = RestartObjectGated
 
 type RestartDeploymentWrapper struct{}
 

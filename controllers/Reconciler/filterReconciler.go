@@ -108,12 +108,14 @@ func (ReconcilerWrapper) FilterNameSpaceNeedAttention(clientset k8s.ClientSet, n
 		Type:             common.DEPLOYMENT,
 		NamespaceObjects: healthyMapNamespaceToDeployments,
 		RestartConfig:    deploymentRestartConfig,
+		Healthy:          true,
 	})
 
 	restarts = append(restarts, common.RestartObjects{
 		Type:             common.ARGO_ROLLOUT,
 		NamespaceObjects: healthyMapNamespaceToArgoRollout,
 		RestartConfig:    argoRestartConfig,
+		Healthy:          true,
 	})
 
 	restarts = append(restarts, common.RestartObjects{
