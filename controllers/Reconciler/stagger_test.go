@@ -93,10 +93,17 @@ func (p recordingProcessor) RestartObject(_ k8s.K8sAPI, _ crdv1.StatusCheckConfi
 	return nil
 }
 
-func (p recordingProcessor) WaitForRestartToBeComplete(_ k8s.K8sAPI, _ crdv1.StatusCheckConfig, ns, name string, _ int) {
+func (p recordingProcessor) WaitForHealthy(_ k8s.K8sAPI, _ crdv1.StatusCheckConfig, ns, name string) {
 	p.shared.mu.Lock()
 	defer p.shared.mu.Unlock()
 	p.shared.sequence = append(p.shared.sequence, "wait-"+p.kind+":"+ns+"/"+name)
+}
+
+// Staggered mode must use the strict WaitForHealthy, never the loose master wait.
+func (p recordingProcessor) WaitForRestartToBeComplete(_ k8s.K8sAPI, _ crdv1.StatusCheckConfig, ns, name string, _ int) {
+	p.shared.mu.Lock()
+	defer p.shared.mu.Unlock()
+	p.shared.sequence = append(p.shared.sequence, "UNEXPECTED WaitForRestartToBeComplete:"+ns+"/"+name)
 }
 
 func (p recordingProcessor) Restart(k8s.K8sAPI, common.RestartObjects) {

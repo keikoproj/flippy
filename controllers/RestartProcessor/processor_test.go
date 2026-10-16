@@ -708,3 +708,122 @@ func TestRestartObject_ReturnsRestartError(t *testing.T) {
 		t.Errorf("expected nil error on success, got %v", err)
 	}
 }
+
+// Real `kubectl rollout status --watch=false` outputs captured on a dev cluster during a
+// staggered run. IsRestartGood (master behaviour, still used for the default mode,
+// Preconditions and PostFilterRestarts) accepts the in-progress ones; the staggered gate must not.
+func TestIsHealthyStrict_RejectsInProgressOutputsIsRestartGoodAccepts(t *testing.T) {
+	tests := []struct {
+		name       string
+		output     string
+		wantStrict bool
+		wantLoose  bool
+	}{
+		{"old replicas pending termination", `Waiting for deployment "web-2" rollout to finish: 1 old replicas are pending termination...`, false, true},
+		{"zero updated replicas available", `Waiting for deployment "web-2" rollout to finish: 0 of 1 updated replicas are available...`, false, true},
+		{"some updated replicas available", `Waiting for deployment "web-2" rollout to finish: 1 of 2 updated replicas are available...`, false, true},
+		{"spec update not observed", "Waiting for deployment spec update to be observed...", false, false},
+		{"deployment rolled out", `deployment "web-2" successfully rolled out`, true, true},
+		{"rollout healthy with newline", "Healthy\n", true, true},
+		{"rollout progressing", "Progressing", false, false},
+		{"rollout degraded", "Degraded", false, false},
+		{"rollout paused", "Paused", false, false},
+		{"empty", "", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsHealthyStrict(tt.output); got != tt.wantStrict {
+				t.Errorf("IsHealthyStrict(%q) = %v, want %v", tt.output, got, tt.wantStrict)
+			}
+			if got := IsRestartGood(tt.output); got != tt.wantLoose {
+				t.Errorf("IsRestartGood(%q) = %v, want %v (master behaviour must not change)", tt.output, got, tt.wantLoose)
+			}
+		})
+	}
+}
+
+// Regression: the gate used to release on in-progress Deployment output after a single poll.
+func TestRestartObjectGated_HoldsUntilDeploymentFullyRolledOut(t *testing.T) {
+	withNoSettle(t)
+	outputs := []string{
+		`Waiting for deployment "obj" rollout to finish: 1 old replicas are pending termination...`,
+		`Waiting for deployment "obj" rollout to finish: 0 of 1 updated replicas are available...`,
+		`deployment "obj" successfully rolled out`,
+	}
+	calls := 0
+	mockK8s := &MockK8sAPI{RolloutDeploymentStatusFunc: func(_, _, _ string) (string, error) {
+		out := outputs[calls]
+		calls++
+		return out, nil
+	}}
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 5, RetryDuration: 1}, "ns", "obj")
+	want := []string{"restart:ns/obj", "status:ns/obj", "status:ns/obj", "status:ns/obj"}
+	if !reflect.DeepEqual(mockK8s.Sequence, want) {
+		t.Errorf("want %v, got %v", want, mockK8s.Sequence)
+	}
+}
+
+// Regression: in-progress Deployment output must exhaust the retry budget, not pass.
+func TestRestartObjectGated_TimesOutOnInProgressDeploymentOutput(t *testing.T) {
+	withNoSettle(t)
+	mockK8s := &MockK8sAPI{RolloutDeploymentStatusFunc: func(_, _, _ string) (string, error) {
+		return `Waiting for deployment "obj" rollout to finish: 1 old replicas are pending termination...`, nil
+	}}
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 2, RetryDuration: 1}, "ns", "obj")
+	if got := len(mockK8s.DeploymentStatusCalls); got != 3 { // initial + 2 retries
+		t.Errorf("expected 3 status calls, got %d: %v", got, mockK8s.Sequence)
+	}
+}
+
+func TestRestartObjectGated_RolloutHoldsUntilHealthy(t *testing.T) {
+	withNoSettle(t)
+	outputs := []string{"Progressing", "Progressing", "Healthy"}
+	calls := 0
+	mockK8s := &MockK8sAPI{RolloutArogRolloutStatusFunc: func(_, _, _ string) (string, error) {
+		out := outputs[calls]
+		calls++
+		return out, nil
+	}}
+	RestartObjectGated(mockK8s, RestartRolloutWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 5, RetryDuration: 1}, "ns", "obj")
+	if calls != 3 {
+		t.Errorf("expected 3 status calls, got %d: %v", calls, mockK8s.Sequence)
+	}
+}
+
+// A status fetch error counts as not healthy and is retried rather than released.
+func TestRestartObjectGated_StatusErrorIsRetried(t *testing.T) {
+	withNoSettle(t)
+	calls := 0
+	mockK8s := &MockK8sAPI{RolloutDeploymentStatusFunc: func(_, _, _ string) (string, error) {
+		calls++
+		if calls == 1 {
+			return "", errors.New("connection refused")
+		}
+		return `deployment "obj" successfully rolled out`, nil
+	}}
+	RestartObjectGated(mockK8s, RestartDeploymentWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 3, RetryDuration: 1}, "ns", "obj")
+	if calls != 2 {
+		t.Errorf("expected 2 status calls, got %d", calls)
+	}
+}
+
+// Both the settle delay and the waits between polls use StaggerSleep with RetryDuration.
+func TestRestartObjectGated_RetrySleepsUseRetryDuration(t *testing.T) {
+	original := StaggerSleep
+	t.Cleanup(func() { StaggerSleep = original })
+	var sleeps []time.Duration
+	StaggerSleep = func(d time.Duration) { sleeps = append(sleeps, d) }
+
+	outputs := []string{"Progressing", "Healthy"}
+	calls := 0
+	mockK8s := &MockK8sAPI{RolloutArogRolloutStatusFunc: func(_, _, _ string) (string, error) {
+		out := outputs[calls]
+		calls++
+		return out, nil
+	}}
+	RestartObjectGated(mockK8s, RestartRolloutWrapper{}, crdv1.StatusCheckConfig{MaxRetry: 3, RetryDuration: 4}, "ns", "obj")
+	want := []time.Duration{4 * time.Second, 4 * time.Second} // settle + one retry
+	if !reflect.DeepEqual(sleeps, want) {
+		t.Errorf("want sleeps %v, got %v", want, sleeps)
+	}
+}

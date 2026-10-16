@@ -75,8 +75,10 @@ Example - <br>
      unset, invalid or non-positive values use the default).
    - Within a group, namespaces are processed one at a time in sorted order.
    - Within a namespace, all Deployments are processed first, then all Rollouts, one object at a time.
-     Objects that were healthy before the restart are waited on until they report healthy or exhaust their
-     retries before the next object is restarted. The wait is forced even if
+     Objects that were healthy before the restart are waited on until they report fully rolled out (a
+     Deployment's `kubectl rollout status` says `successfully rolled out`; an Argo Rollout's status is
+     `Healthy`) or exhaust their retries before the next object is restarted. In-progress states such as
+     `1 old replicas are pending termination` do not release the gate. The wait is forced even if
      `RestartObjects[].StatusCheckConfig.CheckStatus` is `false`; `MaxRetry` and `RetryDuration` are taken
      from that config when set, otherwise default to 10 retries every 30 seconds. Flippy pauses one
      `RetryDuration` after each restart before the first status poll so a stale "Healthy" status cannot release

@@ -37,13 +37,14 @@ func (RestartRolloutWrapper) Restart(k8s k8s.K8sAPI, restart common.RestartObjec
 	}
 }
 
-// StaggerSleep is the sleep used for the settle delay before the first status
-// poll in staggered mode. It is a variable so tests can replace it.
+// StaggerSleep is the sleep used by staggered mode for the settle delay before
+// the first status poll and for the waits between polls. It is a variable so
+// tests can replace it.
 var StaggerSleep = time.Sleep
 
-// RestartObjectGated restarts a single object and then waits for it to report
-// healthy (or exhaust retries) before returning. The wait is forced regardless
-// of config.CheckStatus; MaxRetry/RetryDuration fall back to defaults when unset.
+// RestartObjectGated restarts a single object and then waits for it to be
+// strictly healthy (see IsHealthyStrict) or exhaust retries before returning.
+// The wait is forced regardless of config.CheckStatus; MaxRetry/RetryDuration fall back to defaults when unset.
 // A settle delay of one RetryDuration precedes the first status poll because
 // Argo Rollouts can still report Healthy right after the restart annotation is
 // patched. If the restart command itself fails the wait is skipped.
@@ -58,7 +59,52 @@ func RestartObjectGated(k8s k8s.K8sAPI, processor RestartProcessorInterface, con
 		return
 	}
 	StaggerSleep(time.Duration(waitConfig.RetryDuration) * time.Second)
-	processor.WaitForRestartToBeComplete(k8s, waitConfig, namespace, objectName, 0)
+	processor.WaitForHealthy(k8s, waitConfig, namespace, objectName)
+}
+
+// IsHealthyStrict reports whether a rollout status output means the rollout has
+// fully completed: a Deployment prints "successfully rolled out" and an Argo
+// Rollout prints exactly "Healthy". Unlike IsRestartGood it does not accept
+// in-progress outputs such as "1 old replicas are pending termination" or
+// "0 of 1 updated replicas are available", so the staggered gate really waits
+// for the object it just restarted. IsRestartGood is unchanged and remains the
+// check for the default mode, Preconditions and PostFilterRestarts.
+func IsHealthyStrict(output string) bool {
+	output = strings.TrimSpace(output)
+	return strings.Contains(output, "successfully rolled out") || output == "Healthy"
+}
+
+// waitForHealthy polls status until IsHealthyStrict passes or MaxRetry retries
+// are exhausted, sleeping RetryDuration between polls. Staggered mode only.
+func waitForHealthy(status func() (string, error), waitConfig crdv1.StatusCheckConfig, logFields log.Fields) {
+	for retryCount := 0; ; retryCount++ {
+		output, err := status()
+		if err != nil {
+			log.WithFields(logFields).WithField(common.RETRY_COUNT, retryCount).Error("Failed to fetch status", err)
+		}
+		if IsHealthyStrict(output) {
+			log.WithFields(logFields).Info("Restart completed")
+			return
+		}
+		if retryCount >= waitConfig.MaxRetry {
+			log.WithFields(logFields).WithField(common.RETRY_COUNT, retryCount).Info("Restart retry timed out. Status - " + strings.TrimSpace(output))
+			return
+		}
+		log.WithFields(logFields).Infof("Not healthy yet, retrying in %ds. Status - %s", waitConfig.RetryDuration, strings.TrimSpace(output))
+		StaggerSleep(time.Duration(waitConfig.RetryDuration) * time.Second)
+	}
+}
+
+func (RestartDeploymentWrapper) WaitForHealthy(k8s k8s.K8sAPI, waitConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string) {
+	waitForHealthy(func() (string, error) {
+		return k8s.RolloutDeploymentStatus(common.KubeconfigPath, namespace, restartObjectName)
+	}, waitConfig, log.Fields{common.TYPE: common.DEPLOYMENT, common.NAME: restartObjectName, common.NAMESPACE: namespace})
+}
+
+func (RestartRolloutWrapper) WaitForHealthy(k8s k8s.K8sAPI, waitConfig crdv1.StatusCheckConfig, namespace string, restartObjectName string) {
+	waitForHealthy(func() (string, error) {
+		return k8s.RolloutArogRolloutStatus(common.KubeconfigPath, namespace, restartObjectName)
+	}, waitConfig, log.Fields{common.TYPE: common.ARGO_ROLLOUT, common.NAME: restartObjectName, common.NAMESPACE: namespace})
 }
 
 // staggerWaitConfig forces a status check, falling back to defaults when the
